@@ -1,0 +1,61 @@
+"""Portable SQLAlchemy repository typing aliases (PyPI-safe, no app imports)."""
+
+from __future__ import annotations
+from collections.abc import Mapping
+from datetime import date
+from datetime import datetime
+from uuid import UUID
+from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.sql import ColumnElement
+from sqlalchemy.sql import Select
+from sqlalchemy.sql.selectable import FromClause
+from sqlalchemy.sql.selectable import LateralFromClause
+from sqlalchemy.sql.selectable import ScalarSelect
+from sqlalchemy.sql.selectable import TableClause
+
+__all__ = [
+    "ApiObject",
+    "ApiScalar",
+    "IdList",
+    "JSONObject",
+    "JSONScalar",
+    "JSONValue",
+    "OrmModel",
+    "PrimaryKey",
+    "RowMapping",
+    "RowValue",
+    "SqlBindParams",
+    "SqlFilter",
+    "SqlFilters",
+    "SqlFromClause",
+    "SqlLateral",
+    "SqlOrderColumn",
+    "SqlScalarSubquery",
+    "SqlSelect",
+    "SqlTable",
+]
+
+type JSONScalar = str | int | float | bool | None
+type JSONValue = JSONScalar | list[JSONValue] | dict[str, JSONValue]
+type JSONObject = dict[str, JSONValue]
+
+type ApiScalar = JSONScalar | datetime | date | UUID
+type RowValue = JSONScalar | datetime | date | UUID | bytes | dict[str, RowValue] | list[RowValue]
+type ApiObject = dict[str, RowValue]
+
+type PrimaryKey = int | str | UUID
+type IdList = list[PrimaryKey]
+
+type SqlBindParams = dict[str, RowValue]
+type SqlFilter = ColumnElement[bool]
+type SqlFilters = list[SqlFilter]
+type SqlOrderColumn = ColumnElement[object]
+type SqlSelect = Select[tuple[object, ...]]
+type SqlFromClause = FromClause
+type SqlLateral = LateralFromClause
+type SqlScalarSubquery = ScalarSelect[object]
+type SqlTable = TableClause
+
+type RowMapping = Mapping[str, RowValue]
+
+type OrmModel = type[DeclarativeBase]
