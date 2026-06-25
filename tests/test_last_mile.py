@@ -20,15 +20,15 @@ from sqlphilosophy.sync.repository import BaseRepository
 
 
 def test_row_float_and_api_paths() -> None:
-    assert row_float({"x": 1.0}, "x") == 1.0
-    assert row_float({"x": 2}, "x") == 2.0
-    assert row_opt_float({"x": 1.0}, "x") == 1.0
+    assert row_float({"x": 1.0}, "x") == pytest.approx(1.0)
+    assert row_float({"x": 2}, "x") == pytest.approx(2.0)
+    assert row_opt_float({"x": 1.0}, "x") == pytest.approx(1.0)
     with pytest.raises(TypeError):
         row_float({"x": "nope"}, "x")
     with pytest.raises(TypeError):
         row_opt_float({"x": "nope"}, "x")
     assert api_int({"x": 7}, "x") == 7
-    assert api_float({"x": 2.5}, "x") == 2.5
+    assert api_float({"x": 2.5}, "x") == pytest.approx(2.5)
     assert row_json({"x": True}, "x") is True
     with pytest.raises(TypeError):
         row_json({"x": {1: 2}}, "x")

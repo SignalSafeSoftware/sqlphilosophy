@@ -75,7 +75,7 @@ def test_row_coercions() -> None:
     assert row_opt_str(row, "ni") is None
     assert row_bool(row, "b") is True
     assert row_opt_bool(row, "ni") is None
-    assert row_float(row, "f") == 1.5
+    assert row_float(row, "f") == pytest.approx(1.5)
     assert row_opt_float(row, "ni") is None
     assert row_json(row, "json") == {"a": 1}
     assert row_json_object(row, "json") == {"a": 1}
@@ -99,9 +99,9 @@ def test_api_int_float_defaults() -> None:
     assert api_int({}, "missing") == 0
     assert api_int({"x": "nope"}, "x") == 0
     assert api_int({"x": True}, "x") == 1
-    assert api_float({}, "missing") == 0.0
-    assert api_float({"x": "nope"}, "x") == 0.0
-    assert api_float({"x": 2}, "x") == 2.0
+    assert api_float({}, "missing") == pytest.approx(0.0)
+    assert api_float({"x": "nope"}, "x") == pytest.approx(0.0)
+    assert api_float({"x": 2}, "x") == pytest.approx(2.0)
     assert api_int({"x": object()}, "x") == 0
 
 

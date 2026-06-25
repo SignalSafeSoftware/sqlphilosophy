@@ -78,7 +78,7 @@ def test_row_coercion_success_variants() -> None:
     assert row_opt_int(row, "missing") is None
     assert row_opt_str(row, "missing") is None
     assert row_opt_bool(row, "b") is False
-    assert row_opt_float(row, "f") == 3.0
+    assert row_opt_float(row, "f") == pytest.approx(3.0)
     assert row_uuid(row, "uid") == uid
 
 
@@ -129,7 +129,7 @@ def test_col_range_lte_and_merge_none() -> None:
 
     crit, params = col_range("t.id", "hi", "<=", 9)
     assert params["hi"] == 9
-    criteria, merged = merge_criteria(None, ([crit], params))
+    criteria, _ = merge_criteria(None, ([crit], params))
     assert criteria
 
 
@@ -151,9 +151,9 @@ def test_api_int_float_more_branches() -> None:
 
     assert api_int({"x": 1.5}, "x") == 1
     assert api_int({"x": "3"}, "x") == 3
-    assert api_float({"x": True}, "x") == 1.0
-    assert api_float({"x": "2.5"}, "x") == 2.5
-    assert api_float({"x": object()}, "x") == 0.0
+    assert api_float({"x": True}, "x") == pytest.approx(1.0)
+    assert api_float({"x": "2.5"}, "x") == pytest.approx(2.5)
+    assert api_float({"x": object()}, "x") == pytest.approx(0.0)
 
 
 def test_partial_update_model_branches(sync_session: Session) -> None:
@@ -330,7 +330,7 @@ async def test_async_query_extended(async_session) -> None:
         .count()
     )
     b2 = AsyncSqlAlchemyStatementBuilder(async_session, Widget).select_entity()
-    rows, total = await b2.fetch_page(ListQuery(offset=0, limit=1))
+    _, total = await b2.fetch_page(ListQuery(offset=0, limit=1))
     assert total >= 1
     await b2.count_distinct(Widget.id)
     with pytest.raises(ValueError, match="offset must be >= 0"):
