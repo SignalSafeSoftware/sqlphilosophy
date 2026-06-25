@@ -1,6 +1,7 @@
 """Shared fixtures for sqlphilosophy tests."""
 
 from __future__ import annotations
+from collections.abc import AsyncGenerator
 from datetime import datetime
 import pytest
 
@@ -96,7 +97,7 @@ def sync_session() -> Session:
 
 
 @pytest.fixture
-async def async_session() -> AsyncSession:
+async def async_session() -> AsyncGenerator[AsyncSession, None]:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
