@@ -73,3 +73,8 @@ show_missing = true
 exclude_also = [
     "raise NotImplementedError",
 ]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["sqlalchemy.ext.mypy.plugin"]
+warn_unused_ignores = true

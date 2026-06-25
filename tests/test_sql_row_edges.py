@@ -27,11 +27,11 @@ def test_row_opt_str_types() -> None:
 
 
 def test_row_float_int_path() -> None:
-    assert row_float({"x": 2}, "x") == 2.0
+    assert row_float({"x": 2}, "x") == pytest.approx(2.0)
 
 
 def test_row_opt_float_int_path() -> None:
-    assert row_opt_float({"x": 2}, "x") == 2.0
+    assert row_opt_float({"x": 2}, "x") == pytest.approx(2.0)
 
 
 def test_row_opt_bool_true() -> None:

@@ -5,6 +5,7 @@ from abc import ABC
 from datetime import datetime
 from datetime import timezone
 from typing import Any
+from typing import cast
 from sqlalchemy import event
 from sqlalchemy.orm import Mapper
 from sqlphilosophy.audit.context import get_audit_context
@@ -72,13 +73,13 @@ class AuditListener(ABC):
         def _before_insert(mapper: Mapper[Any], connection: object, target: object) -> None:
             if not is_audit_model(target):
                 return  # pragma: no cover
-            listener.stamp_on_insert(target)
+            listener.stamp_on_insert(cast(AuditMixin, target))
 
         @event.listens_for(AuditMixin, "before_update", propagate=True)
         def _before_update(mapper: Mapper[Any], connection: object, target: object) -> None:
             if not is_audit_model(target):
                 return  # pragma: no cover
-            listener.stamp_on_update(target)
+            listener.stamp_on_update(cast(AuditMixin, target))
 
         _ATTACHED = True
 

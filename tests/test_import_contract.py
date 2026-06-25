@@ -16,15 +16,17 @@ def test_canonical_imports() -> None:
     from sqlphilosophy.sync.query import SqlAlchemyStatementBuilder
     from sqlphilosophy.sync.repository import BaseRepository
 
-    assert BaseRepository is not None
-    assert SqlAlchemyStatementBuilder is not None
-    assert RepositoryFactory is not None
-    assert AsyncBaseRepository is not None
-    assert AsyncSqlAlchemyStatementBuilder is not None
-    assert AsyncRepositoryFactory is not None
-    assert ListQuery is not None
-    assert audit_context is not None
-    assert TimestampModel is not None
+    _ = (
+        BaseRepository,
+        SqlAlchemyStatementBuilder,
+        RepositoryFactory,
+        AsyncBaseRepository,
+        AsyncSqlAlchemyStatementBuilder,
+        AsyncRepositoryFactory,
+        ListQuery,
+        audit_context,
+        TimestampModel,
+    )
 
 
 @pytest.mark.parametrize(

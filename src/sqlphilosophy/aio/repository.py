@@ -24,7 +24,9 @@ from sqlphilosophy.types import PrimaryKey
 from sqlphilosophy.types import RowMapping
 from sqlphilosophy.types import RowValue
 from sqlphilosophy.types import SqlBindParams
+from sqlphilosophy.types import SqlFilter
 from sqlphilosophy.types import SqlSelect
+from sqlphilosophy.types import cursor_rowcount
 
 LoadRelations = Sequence[LoaderOption]
 
@@ -60,7 +62,10 @@ class AsyncBaseRepository[T: DeclarativeBase]:
         connection = await self.session.connection()
 
         def _names(sync_conn: object) -> frozenset[str]:
-            return frozenset(sa_inspect(sync_conn).get_table_names())
+            insp = sa_inspect(sync_conn)
+            if insp is None:
+                return frozenset()
+            return frozenset(insp.get_table_names())
 
         return await connection.run_sync(_names)
 
@@ -161,11 +166,11 @@ class AsyncBaseRepository[T: DeclarativeBase]:
         """True when a row exists for the primary key."""
         return await self.get_by_id(obj_id) is not None
 
-    async def exists_where(self, **filters: object) -> bool:
+    async def exists_where(self, **filters: RowValue) -> bool:
         """True when at least one row matches optional equality filters."""
         return await self.count(**filters) > 0
 
-    async def count(self, **filters: object) -> int:
+    async def count(self, **filters: RowValue) -> int:
         """Count rows matching optional equality filters."""
         stmt = select(func.count()).select_from(self.model)
         if filters:
@@ -174,7 +179,7 @@ class AsyncBaseRepository[T: DeclarativeBase]:
         return int(result or 0)
 
     async def first(
-        self, load_relations: LoadRelations | None = None, **filters: object
+        self, load_relations: LoadRelations | None = None, **filters: RowValue
     ) -> T | None:
         """Return the first row matching filters, with optional eager loading."""
         stmt = select(self.model).filter_by(**filters).limit(1)
@@ -206,7 +211,7 @@ class AsyncBaseRepository[T: DeclarativeBase]:
         page: int = 1,
         limit: int | None = None,
         load_relations: LoadRelations | None = None,
-        **filters: object,
+        **filters: RowValue,
     ) -> Sequence[T]:
         """Return rows matching optional equality filters, optionally paginated."""
         if page < 1:
@@ -254,7 +259,7 @@ class AsyncBaseRepository[T: DeclarativeBase]:
         if filter_expressions:
             stmt = stmt.where(*filter_expressions)
         result = await self.session.execute(stmt)
-        return result.all()
+        return cast(Sequence[tuple[T, Any]], result.all())
 
     async def create(self, **fields: object) -> T:
         """Construct, stage, and flush a new instance."""
@@ -264,10 +269,10 @@ class AsyncBaseRepository[T: DeclarativeBase]:
         self,
         *,
         defaults: RowMapping | None = None,
-        **lookup: object,
+        **lookup: RowValue,
     ) -> tuple[T, bool]:
         """Return ``(instance, created)`` for equality ``lookup`` filters."""
-        existing = await self.first(**lookup)
+        existing = await self.first(load_relations=None, **lookup)
         if existing is not None:
             return existing, False
         payload: RowMapping = {**(defaults or {}), **lookup}
@@ -310,12 +315,12 @@ class AsyncBaseRepository[T: DeclarativeBase]:
         pk_col = self._pk_column
         stmt = update(self.model).where(pk_col == obj_id).values(**core_updates)
         result = await self.session.execute(stmt)
-        return int(result.rowcount or 0)
+        return cursor_rowcount(result)
 
     async def update_where(
         self,
         *,
-        criteria: Sequence[object],
+        criteria: Sequence[SqlFilter],
         values: RowMapping,
         params: SqlBindParams | None = None,
     ) -> int:
@@ -324,12 +329,12 @@ class AsyncBaseRepository[T: DeclarativeBase]:
             return 0
         stmt = update(self.model).where(*criteria).values(**values)
         result = await self.session.execute(stmt, params or {})
-        return int(result.rowcount or 0)
+        return cursor_rowcount(result)
 
     async def delete_where(
         self,
         *,
-        criteria: Sequence[object],
+        criteria: Sequence[SqlFilter],
         params: SqlBindParams | None = None,
     ) -> int:
         """Delete rows matching ``criteria`` via PK lookup + ``delete_many``."""
@@ -340,14 +345,14 @@ class AsyncBaseRepository[T: DeclarativeBase]:
         if params:
             builder = builder.with_params(params)
         rows = await builder.mappings().all()
-        ids = [row[pk_key] for row in rows]
+        ids = [cast(PrimaryKey, row[pk_key]) for row in rows]
         return await self.delete_many(ids)
 
     async def remove(self, obj_id: PrimaryKey) -> bool:
         """Delete a record by primary key."""
         statement = delete(self.model).where(self._pk_column == obj_id)
         result = await self.session.execute(statement)
-        return bool(result.rowcount)
+        return cursor_rowcount(result) > 0
 
     async def delete_many(self, ids: IdList) -> int:
         """Delete multiple records by primary key."""
@@ -355,17 +360,17 @@ class AsyncBaseRepository[T: DeclarativeBase]:
             return 0
         stmt = delete(self.model).where(self._pk_column.in_(ids))
         result = await self.session.execute(stmt)
-        return int(result.rowcount or 0)
+        return cursor_rowcount(result)
 
     async def delete_all(self) -> int:
         """Delete every row for this model. Dev/ops only — prefer ``delete_where`` in app code."""
         result = await self.session.execute(delete(self.model))
-        return int(result.rowcount or 0)
+        return cursor_rowcount(result)
 
     async def batched_purge_ids(
         self,
         *,
-        criteria: list[object],
+        criteria: list[SqlFilter],
         batch_size: int,
     ) -> int:
         """Delete rows matching ``criteria`` in ``batch_size`` chunks, committing each batch."""
@@ -380,7 +385,7 @@ class AsyncBaseRepository[T: DeclarativeBase]:
                 .mappings()
                 .all()
             )
-            ids = [row[pk_key] for row in rows]
+            ids = [cast(PrimaryKey, row[pk_key]) for row in rows]
             if not ids:
                 break
             total += await self.delete_many(ids)
