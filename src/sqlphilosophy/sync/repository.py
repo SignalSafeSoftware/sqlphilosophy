@@ -3,6 +3,7 @@
 from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
+from typing import cast
 from sqlalchemy import delete
 from sqlalchemy import func
 from sqlalchemy import inspect as sa_inspect
@@ -23,8 +24,11 @@ from sqlphilosophy.sync.query import StatementQueryBuilder
 from sqlphilosophy.types import IdList
 from sqlphilosophy.types import PrimaryKey
 from sqlphilosophy.types import RowMapping
+from sqlphilosophy.types import RowValue
 from sqlphilosophy.types import SqlBindParams
+from sqlphilosophy.types import SqlFilter
 from sqlphilosophy.types import SqlSelect
+from sqlphilosophy.types import cursor_rowcount
 
 LoadRelations = Sequence[LoaderOption]
 
@@ -148,18 +152,18 @@ class BaseRepository[T: DeclarativeBase]:
         """True when a row exists for the primary key."""
         return self.get_by_id(obj_id) is not None
 
-    def exists_where(self, **filters: object) -> bool:
+    def exists_where(self, **filters: RowValue) -> bool:
         """True when at least one row matches optional equality filters."""
         return self.count(**filters) > 0
 
-    def count(self, **filters: object) -> int:
+    def count(self, **filters: RowValue) -> int:
         """Count rows matching optional equality filters."""
         stmt = select(func.count()).select_from(self.model)
         if filters:
             stmt = stmt.filter_by(**filters)
         return int(self.session.scalar(stmt) or 0)
 
-    def first(self, load_relations: LoadRelations | None = None, **filters: object) -> T | None:
+    def first(self, load_relations: LoadRelations | None = None, **filters: RowValue) -> T | None:
         """Return the first row matching filters, with optional eager loading."""
         stmt = select(self.model).filter_by(**filters).limit(1)
         stmt = self._apply_load_relations(stmt, load_relations)
@@ -188,7 +192,7 @@ class BaseRepository[T: DeclarativeBase]:
         page: int = 1,
         limit: int | None = None,
         load_relations: LoadRelations | None = None,
-        **filters: object,
+        **filters: RowValue,
     ) -> Sequence[T]:
         """Return rows matching optional equality filters, optionally paginated."""
         if page < 1:
@@ -233,7 +237,7 @@ class BaseRepository[T: DeclarativeBase]:
             stmt = stmt.join(target_model)  # pragma: no cover
         if filter_expressions:
             stmt = stmt.where(*filter_expressions)
-        return self.session.execute(stmt).all()
+        return cast(Sequence[tuple[T, Any]], self.session.execute(stmt).all())
 
     def create(self, **fields: object) -> T:
         """Construct, stage, and flush a new instance."""
@@ -243,10 +247,10 @@ class BaseRepository[T: DeclarativeBase]:
         self,
         *,
         defaults: RowMapping | None = None,
-        **lookup: object,
+        **lookup: RowValue,
     ) -> tuple[T, bool]:
         """Return ``(instance, created)`` for equality ``lookup`` filters."""
-        existing = self.first(**lookup)
+        existing = self.first(load_relations=None, **lookup)
         if existing is not None:
             return existing, False
         payload: RowMapping = {**(defaults or {}), **lookup}
@@ -279,7 +283,7 @@ class BaseRepository[T: DeclarativeBase]:
     def update_where(
         self,
         *,
-        criteria: Sequence[object],
+        criteria: Sequence[SqlFilter],
         values: RowMapping,
         params: SqlBindParams | None = None,
     ) -> int:
@@ -288,12 +292,12 @@ class BaseRepository[T: DeclarativeBase]:
             return 0
         stmt = update(self.model).where(*criteria).values(**values)
         result = self.session.execute(stmt, params or {})
-        return int(result.rowcount or 0)
+        return cursor_rowcount(result)
 
     def delete_where(
         self,
         *,
-        criteria: Sequence[object],
+        criteria: Sequence[SqlFilter],
         params: SqlBindParams | None = None,
     ) -> int:
         """Delete rows matching ``criteria`` via PK lookup + ``delete_many``."""
@@ -304,14 +308,14 @@ class BaseRepository[T: DeclarativeBase]:
         if params:
             builder = builder.with_params(params)
         rows = builder.mappings().all()
-        ids = [row[pk_key] for row in rows]
+        ids = [cast(PrimaryKey, row[pk_key]) for row in rows]
         return self.delete_many(ids)
 
     def remove(self, obj_id: PrimaryKey) -> bool:
         """Delete a record by primary key."""
         statement = delete(self.model).where(self._pk_column == obj_id)
         result = self.session.execute(statement)
-        return bool(result.rowcount)
+        return cursor_rowcount(result) > 0
 
     def delete_many(self, ids: IdList) -> int:
         """Delete multiple records by primary key."""
@@ -320,12 +324,12 @@ class BaseRepository[T: DeclarativeBase]:
     def delete_all(self) -> int:
         """Delete every row for this model. Dev/ops only — prefer ``delete_where`` in app code."""
         result = self.session.execute(delete(self.model))
-        return int(result.rowcount or 0)
+        return cursor_rowcount(result)
 
     def batched_purge_ids(
         self,
         *,
-        criteria: list[object],
+        criteria: list[SqlFilter],
         batch_size: int,
     ) -> int:
         """Delete rows matching ``criteria`` in ``batch_size`` chunks, committing each batch."""
@@ -340,7 +344,7 @@ class BaseRepository[T: DeclarativeBase]:
                 .mappings()
                 .all()
             )
-            ids = [row[pk_key] for row in rows]
+            ids = [cast(PrimaryKey, row[pk_key]) for row in rows]
             if not ids:
                 break
             total += self.delete_many(ids)

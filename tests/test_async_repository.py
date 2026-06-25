@@ -109,3 +109,15 @@ async def test_async_extended_helpers(async_session: AsyncSession) -> None:
     names = await repo.list_table_names()
     assert "widget" in names
     assert await repo.has_table("widget")
+
+
+async def test_list_table_names_without_inspector(
+    async_session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = AsyncBaseRepository(Widget, async_session)
+
+    def _no_inspect(_conn: object) -> None:
+        return None
+
+    monkeypatch.setattr("sqlphilosophy.aio.repository.sa_inspect", _no_inspect)
+    assert await repo.list_table_names() == frozenset()

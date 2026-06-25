@@ -105,6 +105,11 @@ def test_api_int_float_defaults() -> None:
     assert api_int({"x": object()}, "x") == 0
 
 
+def test_get_column_value_unmapped() -> None:
+    with pytest.raises(TypeError, match="not a mapped SQLAlchemy entity"):
+        get_column_value(object())
+
+
 def test_row_mapping_helpers(sync_session: Session) -> None:
     row = Widget(name="map")
     sync_session.add(row)
