@@ -116,7 +116,8 @@ rows = await repo.statement().where(User.active.is_(True)).mappings().all()
 ## Transaction ownership
 
 - **`create` / `update` / `delete` helpers** on repositories call `session.flush()` but **do not commit** unless documented otherwise.
-- **`delete_all`** and batched **`delete_by_criteria`** helpers **do commit** internally after deleting batches — treat them as destructive, application-level operations you must authorize first.
+- **`delete_all()`** executes a bulk delete and **does not commit** — the caller owns `session.commit()` / `rollback()` for the work unit.
+- **`batched_purge_ids(...)`** deletes matching rows in batches and **commits after each batch** — treat it as a destructive, application-level operation you must authorize first.
 - Your application owns **`session.commit()` / `rollback()`** for normal request/work-unit boundaries.
 
 ## Raw SQL trust boundaries
@@ -131,8 +132,8 @@ The following must be **developer-defined** and must **never** be built from end
 
 ## Destructive helpers
 
-- **`delete_all()`** — removes all rows for the repository model (sync and async variants).
-- **`delete_by_criteria(...)`** — deletes in batches and commits each batch.
+- **`delete_all()`** — removes all rows for the repository model (sync and async variants). Does **not** commit; caller must commit or roll back.
+- **`batched_purge_ids(...)`** — deletes matching rows in batches and commits each batch.
 
 Call only after your application has authorized the operation. These helpers assume the caller understands the data loss impact.
 
