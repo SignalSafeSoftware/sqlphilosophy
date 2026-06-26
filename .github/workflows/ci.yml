@@ -38,7 +38,7 @@ jobs:
             - name: Install package and tooling
               run: |
                   uv venv --seed
-                  uv export --extra dev --no-emit-project -o requirements-dev.txt
+                  uv export --extra dev --frozen --no-emit-project -o requirements-dev.txt
                   .venv/bin/python -m pip install --require-hashes --only-binary :all: --no-deps -r requirements-dev.txt
                   .venv/bin/python -m pip install --no-deps -e .
 
@@ -75,7 +75,7 @@ jobs:
             - name: Install package and tooling
               run: |
                   uv venv --seed
-                  uv export --extra dev --no-emit-project -o requirements-dev.txt
+                  uv export --extra dev --frozen --no-emit-project -o requirements-dev.txt
                   .venv/bin/python -m pip install --require-hashes --only-binary :all: --no-deps -r requirements-dev.txt
                   .venv/bin/python -m pip install --no-deps -e .
 
@@ -150,7 +150,7 @@ jobs:
             - name: Install package and tooling
               run: |
                   uv venv --seed
-                  uv export --extra dev --no-emit-project -o requirements-dev.txt
+                  uv export --extra dev --frozen --no-emit-project -o requirements-dev.txt
                   .venv/bin/python -m pip install --require-hashes --only-binary :all: --no-deps -r requirements-dev.txt
                   .venv/bin/python -m pip install --no-deps -e .
 
@@ -187,7 +187,7 @@ jobs:
             - name: Build distributions
               run: |
                   uv venv --seed
-                  uv export --extra dev --no-emit-project -o requirements-dev.txt
+                  uv export --extra dev --frozen --no-emit-project -o requirements-dev.txt
                   .venv/bin/python -m pip install --require-hashes --only-binary :all: --no-deps -r requirements-dev.txt
                   .venv/bin/python -m build
                   .venv/bin/twine check dist/*
