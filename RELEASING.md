@@ -60,8 +60,22 @@ CI runs `scripts/smoke_package.py` before publish.
 ## One-time PyPI setup
 
 1. Register **`sqlphilosophy`** on PyPI.
-2. Configure **trusted publishing** for owner `SignalSafeSoftware`, repository `sqlphilosophy`, workflow **`ci.yml`**, environment **`pypi`**.
-3. Create GitHub Environment **`pypi`**.
+2. On PyPI → project **Publishing** → **Add a new pending publisher**, configure **exactly**:
+
+   | Field | Value |
+   | ----- | ----- |
+   | Project name | `sqlphilosophy` |
+   | Publisher platform | GitHub Actions |
+   | Owner | `SignalSafeSoftware` |
+   | Repository name | `sqlphilosophy` |
+   | Workflow filename | `ci.yml` |
+   | Environment name | `pypi` |
+
+   Use `ci.yml` only — not `.github/workflows/ci.yml`. The workflow filename must match the OIDC claim `SignalSafeSoftware/sqlphilosophy/.github/workflows/ci.yml`.
+
+3. Create GitHub Environment **`pypi`** in [SignalSafeSoftware/sqlphilosophy](https://github.com/SignalSafeSoftware/sqlphilosophy/settings/environments) (no secrets required for trusted publishing).
+
+If publish fails with `invalid-publisher: valid token, but no corresponding publisher`, PyPI has no publisher matching the workflow claims. Fix the PyPI publisher table above, then **Re-run** the failed workflow — do not bump the version or retag unless `0.1.1` was actually uploaded.
 
 ## Manual upload (fallback)
 
