@@ -132,9 +132,34 @@ jobs:
                           body,
                       });
 
+    smoke-package:
+        name: Smoke package
+        needs: [checks, tests]
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+
+            - uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081 # v5
+              with:
+                  enable-cache: true
+
+            - name: Install package and tooling
+              run: |
+                  uv venv --seed
+                  uv export --extra dev --frozen --no-emit-project -o requirements-dev.txt
+                  .venv/bin/python -m pip install --require-hashes --only-binary :all: --no-deps -r requirements-dev.txt
+                  .venv/bin/python -m pip install --no-deps -e .
+
+            - name: Smoke-test wheel artifact
+              run: .venv/bin/python scripts/smoke_package.py
+
     publish:
         name: Publish
-        needs: [checks, tests, scan]
+        needs: [checks, tests, scan, smoke-package]
         if: |
             (
               (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
