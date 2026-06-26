@@ -170,7 +170,7 @@ See [SECURITY.md](./SECURITY.md) for vulnerability reporting and SQL trust bound
 
 ## Releasing
 
-See [RELEASING.md](./RELEASING.md) for GitHub + PyPI trusted publishing.
+See [RELEASING.md](./RELEASING.md) for GitHub + PyPI trusted publishing. See [CHANGELOG.md](./CHANGELOG.md).
 
 ## License
 
