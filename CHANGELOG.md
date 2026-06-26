@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shared modules: `sorting`, `sql`, `types`, `audit` (context, listener, model).
 - No root-level reexports; compatibility shim modules removed.
 - `SECURITY.md`, Dependabot, production-readiness documentation updates.
+- Expanded unit test coverage.
+- Package artifact smoke test (`scripts/smoke_package.py`).
 
 ### Changed
 
