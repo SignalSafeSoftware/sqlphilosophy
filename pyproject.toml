@@ -69,6 +69,7 @@ addopts = "--cov=sqlphilosophy --cov-report=term-missing --cov-fail-under=100"
 
 [tool.coverage.run]
 source = ["sqlphilosophy"]
+omit = ["scripts/*"]
 branch = false
 
 [tool.coverage.report]
