@@ -75,7 +75,7 @@ CI runs `scripts/smoke_package.py` before publish.
 
 3. Create GitHub Environment **`pypi`** in [SignalSafeSoftware/sqlphilosophy](https://github.com/SignalSafeSoftware/sqlphilosophy/settings/environments) (no secrets required for trusted publishing).
 
-If publish fails with `invalid-publisher: valid token, but no corresponding publisher`, PyPI has no publisher matching the workflow claims. Fix the PyPI publisher table above, then **Re-run** the failed workflow — do not bump the version or retag unless `0.1.1` was actually uploaded.
+If publish fails with `invalid-publisher: valid token, but no corresponding publisher`, PyPI has no publisher matching the workflow claims. Fix the PyPI publisher table above, then **Re-run** the failed workflow — do not bump the version or retag unless `0.1.2` was actually uploaded.
 
 ## Manual upload (fallback)
 
