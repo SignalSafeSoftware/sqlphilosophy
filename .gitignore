@@ -13,4 +13,3 @@ htmlcov/
 .venv/
 venv/
 requirements-dev.txt
-uv.lock
