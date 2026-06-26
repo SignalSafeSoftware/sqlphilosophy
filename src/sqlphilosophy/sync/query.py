@@ -7,6 +7,8 @@ Default read path: ``repo.statement()`` on ``BaseRepository`` via an injected
 from __future__ import annotations
 from abc import ABC
 from abc import abstractmethod
+from collections.abc import Mapping
+from typing import Any
 from typing import cast
 from sqlalchemy import func
 from sqlalchemy import select
@@ -20,6 +22,7 @@ from sqlphilosophy.sql import row_mapping
 from sqlphilosophy.sql import row_mapping_opt
 from sqlphilosophy.sql import rows_mapping
 from sqlphilosophy.types import RowMapping
+from sqlphilosophy.types import SqlClause
 from sqlphilosophy.types import SqlFilter
 
 
@@ -59,18 +62,18 @@ class StatementQueryBuilder[T: DeclarativeBase](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def select_columns(self, *columns: object) -> StatementQueryBuilder[T]:
+    def select_columns(self, *columns: SqlClause) -> StatementQueryBuilder[T]:
         raise NotImplementedError
 
     @abstractmethod
-    def select_from(self, from_clause: object) -> StatementQueryBuilder[T]:
+    def select_from(self, from_clause: SqlClause) -> StatementQueryBuilder[T]:
         raise NotImplementedError
 
     @abstractmethod
     def join(
         self,
-        target: object,
-        onclause: object | None = None,
+        target: SqlClause,
+        onclause: SqlClause | None = None,
         *,
         isouter: bool = False,
     ) -> StatementQueryBuilder[T]:
@@ -79,8 +82,8 @@ class StatementQueryBuilder[T: DeclarativeBase](ABC):
     @abstractmethod
     def outerjoin(
         self,
-        target: object,
-        onclause: object | None = None,
+        target: SqlClause,
+        onclause: SqlClause | None = None,
     ) -> StatementQueryBuilder[T]:
         raise NotImplementedError
 
@@ -89,35 +92,35 @@ class StatementQueryBuilder[T: DeclarativeBase](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def filter_by(self, **kwargs: object) -> StatementQueryBuilder[T]:
+    def filter_by(self, **kwargs: Any) -> StatementQueryBuilder[T]:
         raise NotImplementedError
 
     @abstractmethod
-    def distinct(self, *columns: object) -> StatementQueryBuilder[T]:
+    def distinct(self, *columns: SqlClause) -> StatementQueryBuilder[T]:
         raise NotImplementedError
 
     @abstractmethod
-    def group_by(self, *clauses: object) -> StatementQueryBuilder[T]:
+    def group_by(self, *clauses: SqlClause) -> StatementQueryBuilder[T]:
         raise NotImplementedError
 
     @abstractmethod
-    def correlate(self, *from_clauses: object) -> StatementQueryBuilder[T]:
+    def correlate(self, *from_clauses: SqlClause) -> StatementQueryBuilder[T]:
         raise NotImplementedError
 
     @abstractmethod
-    def correlate_except(self, *from_clauses: object) -> StatementQueryBuilder[T]:
+    def correlate_except(self, *from_clauses: SqlClause) -> StatementQueryBuilder[T]:
         raise NotImplementedError
 
     @abstractmethod
-    def as_lateral(self, name: str) -> object:
+    def as_lateral(self, name: str) -> SqlClause:
         raise NotImplementedError
 
     @abstractmethod
-    def as_cte(self, name: str) -> object:
+    def as_cte(self, name: str) -> SqlClause:
         raise NotImplementedError
 
     @abstractmethod
-    def order_by(self, *clauses: object) -> StatementQueryBuilder[T]:
+    def order_by(self, *clauses: SqlClause) -> StatementQueryBuilder[T]:
         raise NotImplementedError
 
     @abstractmethod
@@ -140,7 +143,7 @@ class StatementQueryBuilder[T: DeclarativeBase](ABC):
     def with_for_update(
         self,
         *,
-        of: object | None = None,
+        of: SqlClause | None = None,
         skip_locked: bool = False,
     ) -> StatementQueryBuilder[T]:
         raise NotImplementedError
@@ -150,7 +153,7 @@ class StatementQueryBuilder[T: DeclarativeBase](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def count_distinct(self, *columns: object) -> int:
+    def count_distinct(self, *columns: SqlClause) -> int:
         raise NotImplementedError
 
     @abstractmethod
@@ -158,7 +161,7 @@ class StatementQueryBuilder[T: DeclarativeBase](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def scalar(self) -> object | None:
+    def scalar(self) -> Any | None:
         raise NotImplementedError
 
     @abstractmethod
@@ -184,43 +187,49 @@ class StatementQueryBuilder[T: DeclarativeBase](ABC):
 
 
 class _SqlAlchemyMappingResult(_MappingResult):
-    def __init__(self, session: Session, stmt: object, params: RowMapping | None = None) -> None:
+    def __init__(self, session: Session, stmt: Select[Any], params: RowMapping | None = None) -> None:
         self._session = session
         self._stmt = stmt
         self._params = params or {}
 
     def all(self) -> list[RowMapping]:
-        mapped = self._session.execute(self._stmt, self._params).mappings()
+        mapped = self._session.execute(
+            self._stmt, cast(Mapping[str, Any], self._params)
+        ).mappings()
         rows = mapped.all() if hasattr(mapped, "all") else mapped
         return rows_mapping(rows)
 
     def first(self) -> RowMapping | None:
-        row = self._session.execute(self._stmt.limit(1), self._params).mappings().first()
+        row = (
+            self._session.execute(self._stmt.limit(1), cast(Mapping[str, Any], self._params))
+            .mappings()
+            .first()
+        )
         return row_mapping_opt(row)
 
     def one(self) -> RowMapping:
-        row = self._session.execute(self._stmt, self._params).mappings().one()
+        row = self._session.execute(self._stmt, cast(Mapping[str, Any], self._params)).mappings().one()
         return row_mapping(row)
 
 
 class _SqlAlchemyScalarResult[T: DeclarativeBase](_ScalarResult[T]):
-    def __init__(self, session: Session, stmt: object, params: RowMapping | None = None) -> None:
+    def __init__(self, session: Session, stmt: Select[Any], params: RowMapping | None = None) -> None:
         self._session = session
         self._stmt = stmt
         self._params = params or {}
 
     def all(self) -> list[T]:
-        return list(self._session.scalars(self._stmt, self._params).all())
+        return list(self._session.scalars(self._stmt, cast(Mapping[str, Any], self._params)).all())
 
     def first(self) -> T | None:
-        return self._session.scalars(self._stmt.limit(1), self._params).first()
+        return self._session.scalars(self._stmt.limit(1), cast(Mapping[str, Any], self._params)).first()
 
 
 class SqlAlchemyStatementBuilder[T: DeclarativeBase](StatementQueryBuilder[T]):
     def __init__(self, session: Session, entity_class: type[T]) -> None:
         self._session = session
         self._entity_class = entity_class
-        self._stmt = select(entity_class)
+        self._stmt: Select[Any] = select(entity_class)
         self._params: RowMapping = {}
 
     def select_entity(self) -> SqlAlchemyStatementBuilder[T]:
@@ -231,18 +240,18 @@ class SqlAlchemyStatementBuilder[T: DeclarativeBase](StatementQueryBuilder[T]):
         self._stmt = select(self._entity_class.__table__)
         return self
 
-    def select_columns(self, *columns: object) -> SqlAlchemyStatementBuilder[T]:
+    def select_columns(self, *columns: SqlClause) -> SqlAlchemyStatementBuilder[T]:
         self._stmt = select(*columns)
         return self
 
-    def select_from(self, from_clause: object) -> SqlAlchemyStatementBuilder[T]:
+    def select_from(self, from_clause: SqlClause) -> SqlAlchemyStatementBuilder[T]:
         self._stmt = self._stmt.select_from(from_clause)
         return self
 
     def join(
         self,
-        target: object,
-        onclause: object | None = None,
+        target: SqlClause,
+        onclause: SqlClause | None = None,
         *,
         isouter: bool = False,
     ) -> SqlAlchemyStatementBuilder[T]:
@@ -254,8 +263,8 @@ class SqlAlchemyStatementBuilder[T: DeclarativeBase](StatementQueryBuilder[T]):
 
     def outerjoin(
         self,
-        target: object,
-        onclause: object | None = None,
+        target: SqlClause,
+        onclause: SqlClause | None = None,
     ) -> SqlAlchemyStatementBuilder[T]:
         if onclause is not None:
             self._stmt = self._stmt.outerjoin(target, onclause)
@@ -267,33 +276,33 @@ class SqlAlchemyStatementBuilder[T: DeclarativeBase](StatementQueryBuilder[T]):
         self._stmt = self._stmt.where(*criteria)
         return self
 
-    def filter_by(self, **kwargs: object) -> SqlAlchemyStatementBuilder[T]:
+    def filter_by(self, **kwargs: Any) -> SqlAlchemyStatementBuilder[T]:
         self._stmt = self._stmt.filter_by(**kwargs)
         return self
 
-    def distinct(self, *columns: object) -> SqlAlchemyStatementBuilder[T]:
+    def distinct(self, *columns: SqlClause) -> SqlAlchemyStatementBuilder[T]:
         self._stmt = self._stmt.distinct(*columns)
         return self
 
-    def group_by(self, *clauses: object) -> SqlAlchemyStatementBuilder[T]:
+    def group_by(self, *clauses: SqlClause) -> SqlAlchemyStatementBuilder[T]:
         self._stmt = self._stmt.group_by(*clauses)
         return self
 
-    def correlate(self, *from_clauses: object) -> SqlAlchemyStatementBuilder[T]:
+    def correlate(self, *from_clauses: SqlClause) -> SqlAlchemyStatementBuilder[T]:
         self._stmt = self._stmt.correlate(*from_clauses)
         return self
 
-    def correlate_except(self, *from_clauses: object) -> SqlAlchemyStatementBuilder[T]:
+    def correlate_except(self, *from_clauses: SqlClause) -> SqlAlchemyStatementBuilder[T]:
         self._stmt = self._stmt.correlate_except(*from_clauses)
         return self
 
-    def as_lateral(self, name: str) -> object:
+    def as_lateral(self, name: str) -> SqlClause:
         return self._stmt.lateral(name)
 
-    def as_cte(self, name: str) -> object:
+    def as_cte(self, name: str) -> SqlClause:
         return self._stmt.cte(name)
 
-    def order_by(self, *clauses: object) -> SqlAlchemyStatementBuilder[T]:
+    def order_by(self, *clauses: SqlClause) -> SqlAlchemyStatementBuilder[T]:
         self._stmt = self._stmt.order_by(*clauses)
         return self
 
@@ -319,7 +328,7 @@ class SqlAlchemyStatementBuilder[T: DeclarativeBase](StatementQueryBuilder[T]):
     def with_for_update(
         self,
         *,
-        of: object | None = None,
+        of: SqlClause | None = None,
         skip_locked: bool = False,
     ) -> SqlAlchemyStatementBuilder[T]:
         if of is not None:
@@ -339,21 +348,25 @@ class SqlAlchemyStatementBuilder[T: DeclarativeBase](StatementQueryBuilder[T]):
         elif froms:
             from_clause = froms[0]
         else:
-            from_clause = self._entity_class
+            from_clause = self._entity_class.__table__
         count_stmt = select(func.count()).select_from(from_clause)
         if self._stmt.whereclause is not None:
             count_stmt = count_stmt.where(self._stmt.whereclause)
-        return int(self._session.execute(count_stmt, self._params).scalar_one() or 0)
+        return int(
+            self._session.execute(count_stmt, cast(Mapping[str, Any], self._params)).scalar_one() or 0
+        )
 
-    def count_distinct(self, *columns: object) -> int:
+    def count_distinct(self, *columns: SqlClause) -> int:
         count_stmt = select(func.count(func.distinct(*columns)))
         count_stmt = count_stmt.select_from(*self._stmt.get_final_froms())
         if self._stmt.whereclause is not None:
             count_stmt = count_stmt.where(self._stmt.whereclause)
-        return int(self._session.execute(count_stmt, self._params).scalar_one() or 0)
+        return int(
+            self._session.execute(count_stmt, cast(Mapping[str, Any], self._params)).scalar_one() or 0
+        )
 
-    def scalar(self) -> object | None:
-        return self._session.execute(self._stmt, self._params).scalar_one()
+    def scalar(self) -> Any | None:
+        return self._session.execute(self._stmt, cast(Mapping[str, Any], self._params)).scalar_one()
 
     def mappings(self) -> _SqlAlchemyMappingResult:
         return _SqlAlchemyMappingResult(self._session, self._stmt, self._params)
@@ -382,11 +395,11 @@ class SqlAlchemyStatementBuilder[T: DeclarativeBase](StatementQueryBuilder[T]):
         return cast(Select[tuple[object, ...]], self._stmt)
 
 
-def lateral_from(select_stmt: object, name: str) -> object:
+def lateral_from(select_stmt: Select[Any], name: str) -> SqlClause:
     """Return a named lateral() subquery from a Core/ORM select."""
     return select_stmt.lateral(name)
 
 
-def cte_from(select_stmt: object, name: str) -> object:
+def cte_from(select_stmt: Select[Any], name: str) -> SqlClause:
     """Return a named CTE from a Core/ORM select."""
     return select_stmt.cte(name)

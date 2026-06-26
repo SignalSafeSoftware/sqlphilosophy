@@ -4,23 +4,22 @@ on:
     workflow_dispatch:
     push:
         branches: [main]
+        tags: ["v*"]
     pull_request:
         branches: [main, develop]
-        types: [opened, synchronize, reopened, labeled, unlabeled]
+        types: [opened, synchronize, reopened]
 
 concurrency:
     group: ci-${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
 
+permissions:
+    contents: read
+
 jobs:
     checks:
         name: Checks (Python ${{ matrix.python-version }})
-        if: |
-            github.event_name == 'workflow_dispatch' ||
-            github.event_name == 'push' ||
-            (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'checks'))
         runs-on: ubuntu-latest
-        container: node:24-alpine
         strategy:
             fail-fast: false
             matrix:
@@ -32,34 +31,32 @@ jobs:
               with:
                   python-version: ${{ matrix.python-version }}
 
-            - name: Install build dependencies
-              run: apk add --no-cache gcc musl-dev libffi-dev
+            - uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081 # v5
+              with:
+                  enable-cache: true
 
             - name: Install package and tooling
               run: |
-                  python -m pip install --upgrade pip
-                  pip install -e ".[dev]" flake8 mypy bandit types-greenlet
+                  uv venv --seed
+                  uv export --extra dev --frozen --no-emit-project -o requirements-dev.txt
+                  .venv/bin/python -m pip install --require-hashes --only-binary :all: --no-deps -r requirements-dev.txt
+                  .venv/bin/python -m pip install --no-deps -e .
 
             - name: Flake8
               if: matrix.python-version == '3.12'
-              run: flake8 src tests --max-line-length=120 --extend-ignore=E203,W503
+              run: .venv/bin/flake8 src tests --max-line-length=120 --extend-ignore=E203,W503
 
             - name: Mypy
               if: matrix.python-version == '3.12'
-              run: mypy src --install-types --non-interactive
+              run: .venv/bin/mypy src --install-types --non-interactive
 
             - name: Bandit
               if: matrix.python-version == '3.12'
-              run: bandit -r src -q
+              run: .venv/bin/bandit -r src -q -x ./tests,./.venv
 
     tests:
         name: Tests (Python ${{ matrix.python-version }})
-        if: |
-            github.event_name == 'workflow_dispatch' ||
-            github.event_name == 'push' ||
-            (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'tests'))
         runs-on: ubuntu-latest
-        container: node:24-alpine
         strategy:
             fail-fast: false
             matrix:
@@ -71,16 +68,19 @@ jobs:
               with:
                   python-version: ${{ matrix.python-version }}
 
-            - name: Install build dependencies
-              run: apk add --no-cache gcc musl-dev libffi-dev
+            - uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081 # v5
+              with:
+                  enable-cache: true
 
             - name: Install package and tooling
               run: |
-                  python -m pip install --upgrade pip
-                  pip install -e ".[dev]"
+                  uv venv --seed
+                  uv export --extra dev --frozen --no-emit-project -o requirements-dev.txt
+                  .venv/bin/python -m pip install --require-hashes --only-binary :all: --no-deps -r requirements-dev.txt
+                  .venv/bin/python -m pip install --no-deps -e .
 
             - name: Pytest with coverage
-              run: python -m pytest -q --cov-report=xml
+              run: .venv/bin/python -m pytest -q --cov-report=xml
 
             - name: Upload coverage
               if: matrix.python-version == '3.12'
@@ -137,12 +137,13 @@ jobs:
         needs: [checks, tests, scan]
         if: |
             (
-              github.event_name == 'workflow_dispatch' ||
-              (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'publish'))
+              (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+              (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
             ) &&
-            (needs.checks.result == 'success' && needs.tests.result == 'success' && needs.scan.result == 'success')
+            needs.checks.result == 'success' &&
+            needs.tests.result == 'success' &&
+            needs.scan.result == 'success'
         runs-on: ubuntu-latest
-        container: node:24-alpine
         permissions:
             contents: read
             id-token: write
@@ -154,15 +155,17 @@ jobs:
               with:
                   python-version: "3.12"
 
-            - name: Install build dependencies
-              run: apk add --no-cache gcc musl-dev libffi-dev
+            - uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081 # v5
+              with:
+                  enable-cache: true
 
             - name: Build distributions
               run: |
-                  python -m pip install --upgrade pip
-                  pip install -e ".[dev]" build twine
-                  python -m build
-                  twine check dist/*
+                  uv venv --seed
+                  uv export --extra dev --frozen --no-emit-project -o requirements-dev.txt
+                  .venv/bin/python -m pip install --require-hashes --only-binary :all: --no-deps -r requirements-dev.txt
+                  .venv/bin/python -m build
+                  .venv/bin/twine check dist/*
 
             - name: Publish to PyPI
-              uses: pypa/gh-action-pypi-publish@release/v1
+              uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1

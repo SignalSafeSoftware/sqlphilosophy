@@ -28,6 +28,7 @@ from sqlphilosophy.audit.model import AuditMixin
 from sqlphilosophy.sorting import OrderByMap
 from sqlphilosophy.sorting import SortConfig
 from sqlphilosophy.types import ApiObject
+from sqlphilosophy.types import cursor_rowcount
 from sqlphilosophy.types import JSONObject
 from sqlphilosophy.types import JSONValue
 from sqlphilosophy.types import PrimaryKey
@@ -48,7 +49,9 @@ def sql_table(table_name: str, *column_names: str) -> SqlTable:
 
 def get_column_value(entity: object) -> ApiObject:
     """Return mapped column values for an ORM entity instance."""
-    insp = sa_inspect(entity.__class__)
+    insp = sa_inspect(type(entity), raiseerr=False)
+    if insp is None:
+        raise TypeError(f"{type(entity)!r} is not a mapped SQLAlchemy entity")
     return {attr.key: getattr(entity, attr.key) for attr in insp.mapper.column_attrs}
 
 
@@ -338,7 +341,7 @@ def partial_update_model(
     pk_col = getattr(model, pk_attr)
     stmt = update(model).where(pk_col == pk_value).values(**core_updates)
     result = session.execute(stmt)
-    return int(result.rowcount or 0)
+    return cursor_rowcount(result)
 
 
 def partial_update(
@@ -364,7 +367,7 @@ def partial_update(
     tbl = sql_table(table_name, *col_names)
     stmt = update(tbl).where(tbl.c[pk_column] == pk_value).values(**updates)
     result = session.execute(stmt)
-    return int(result.rowcount or 0)
+    return cursor_rowcount(result)
 
 
 def apply_writable_update(
@@ -396,7 +399,7 @@ def delete_by_ids(
     tbl = sql_table(table_name, pk_column)
     stmt = delete(tbl).where(tbl.c[pk_column].in_(ids))
     result = session.execute(stmt)
-    return int(result.rowcount or 0)
+    return cursor_rowcount(result)
 
 
 def delete_by_ids_model(
@@ -411,7 +414,7 @@ def delete_by_ids_model(
     pk_col = getattr(model, pk_attr)
     stmt = delete(model).where(pk_col.in_(ids))
     result = session.execute(stmt)
-    return int(result.rowcount or 0)
+    return cursor_rowcount(result)
 
 
 def col_eq(col_sql: str, param_name: str, value: object) -> tuple[SqlFilter, ApiObject]:
@@ -496,7 +499,7 @@ def order_expr_from_sort(
     return literal_order_expr(columns[column][direction])
 
 
-def count_from_subquery(session: Session, subq: object) -> int:
+def count_from_subquery(session: Session, subq: Any) -> int:
     """Count rows from a subquery (path C helper for aggregate count wrappers)."""
     return int(session.execute(select(func.count()).select_from(subq)).scalar_one() or 0)
 

@@ -3,6 +3,8 @@
 from __future__ import annotations
 from abc import ABC
 from abc import abstractmethod
+from collections.abc import Mapping
+from typing import Any
 from typing import cast
 from sqlalchemy import func
 from sqlalchemy import select
@@ -16,6 +18,7 @@ from sqlphilosophy.sql import row_mapping
 from sqlphilosophy.sql import row_mapping_opt
 from sqlphilosophy.sql import rows_mapping
 from sqlphilosophy.types import RowMapping
+from sqlphilosophy.types import SqlClause
 from sqlphilosophy.types import SqlFilter
 
 
@@ -55,18 +58,18 @@ class AsyncStatementQueryBuilder[T: DeclarativeBase](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def select_columns(self, *columns: object) -> AsyncStatementQueryBuilder[T]:
+    def select_columns(self, *columns: SqlClause) -> AsyncStatementQueryBuilder[T]:
         raise NotImplementedError
 
     @abstractmethod
-    def select_from(self, from_clause: object) -> AsyncStatementQueryBuilder[T]:
+    def select_from(self, from_clause: SqlClause) -> AsyncStatementQueryBuilder[T]:
         raise NotImplementedError
 
     @abstractmethod
     def join(
         self,
-        target: object,
-        onclause: object | None = None,
+        target: SqlClause,
+        onclause: SqlClause | None = None,
         *,
         isouter: bool = False,
     ) -> AsyncStatementQueryBuilder[T]:
@@ -75,8 +78,8 @@ class AsyncStatementQueryBuilder[T: DeclarativeBase](ABC):
     @abstractmethod
     def outerjoin(
         self,
-        target: object,
-        onclause: object | None = None,
+        target: SqlClause,
+        onclause: SqlClause | None = None,
     ) -> AsyncStatementQueryBuilder[T]:
         raise NotImplementedError
 
@@ -85,35 +88,35 @@ class AsyncStatementQueryBuilder[T: DeclarativeBase](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def filter_by(self, **kwargs: object) -> AsyncStatementQueryBuilder[T]:
+    def filter_by(self, **kwargs: Any) -> AsyncStatementQueryBuilder[T]:
         raise NotImplementedError
 
     @abstractmethod
-    def distinct(self, *columns: object) -> AsyncStatementQueryBuilder[T]:
+    def distinct(self, *columns: SqlClause) -> AsyncStatementQueryBuilder[T]:
         raise NotImplementedError
 
     @abstractmethod
-    def group_by(self, *clauses: object) -> AsyncStatementQueryBuilder[T]:
+    def group_by(self, *clauses: SqlClause) -> AsyncStatementQueryBuilder[T]:
         raise NotImplementedError
 
     @abstractmethod
-    def correlate(self, *from_clauses: object) -> AsyncStatementQueryBuilder[T]:
+    def correlate(self, *from_clauses: SqlClause) -> AsyncStatementQueryBuilder[T]:
         raise NotImplementedError
 
     @abstractmethod
-    def correlate_except(self, *from_clauses: object) -> AsyncStatementQueryBuilder[T]:
+    def correlate_except(self, *from_clauses: SqlClause) -> AsyncStatementQueryBuilder[T]:
         raise NotImplementedError
 
     @abstractmethod
-    def as_lateral(self, name: str) -> object:
+    def as_lateral(self, name: str) -> SqlClause:
         raise NotImplementedError
 
     @abstractmethod
-    def as_cte(self, name: str) -> object:
+    def as_cte(self, name: str) -> SqlClause:
         raise NotImplementedError
 
     @abstractmethod
-    def order_by(self, *clauses: object) -> AsyncStatementQueryBuilder[T]:
+    def order_by(self, *clauses: SqlClause) -> AsyncStatementQueryBuilder[T]:
         raise NotImplementedError
 
     @abstractmethod
@@ -136,7 +139,7 @@ class AsyncStatementQueryBuilder[T: DeclarativeBase](ABC):
     def with_for_update(
         self,
         *,
-        of: object | None = None,
+        of: SqlClause | None = None,
         skip_locked: bool = False,
     ) -> AsyncStatementQueryBuilder[T]:
         raise NotImplementedError
@@ -146,7 +149,7 @@ class AsyncStatementQueryBuilder[T: DeclarativeBase](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def count_distinct(self, *columns: object) -> int:
+    async def count_distinct(self, *columns: SqlClause) -> int:
         raise NotImplementedError
 
     @abstractmethod
@@ -154,7 +157,7 @@ class AsyncStatementQueryBuilder[T: DeclarativeBase](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def scalar(self) -> object | None:
+    async def scalar(self) -> Any | None:
         raise NotImplementedError
 
     @abstractmethod
@@ -183,7 +186,7 @@ class _AsyncSqlAlchemyMappingResult(_AsyncMappingResult):
     def __init__(
         self,
         session: AsyncSession,
-        stmt: object,
+        stmt: Select[Any],
         params: RowMapping | None = None,
     ) -> None:
         self._session = session
@@ -191,18 +194,20 @@ class _AsyncSqlAlchemyMappingResult(_AsyncMappingResult):
         self._params = params or {}
 
     async def all(self) -> list[RowMapping]:
-        result = await self._session.execute(self._stmt, self._params)
+        result = await self._session.execute(self._stmt, cast(Mapping[str, Any], self._params))
         mapped = result.mappings()
         rows = mapped.all() if hasattr(mapped, "all") else mapped
         return rows_mapping(rows)
 
     async def first(self) -> RowMapping | None:
-        result = await self._session.execute(self._stmt.limit(1), self._params)
+        result = await self._session.execute(
+            self._stmt.limit(1), cast(Mapping[str, Any], self._params)
+        )
         row = result.mappings().first()
         return row_mapping_opt(row)
 
     async def one(self) -> RowMapping:
-        result = await self._session.execute(self._stmt, self._params)
+        result = await self._session.execute(self._stmt, cast(Mapping[str, Any], self._params))
         row = result.mappings().one()
         return row_mapping(row)
 
@@ -211,7 +216,7 @@ class _AsyncSqlAlchemyScalarResult[T: DeclarativeBase](_AsyncScalarResult[T]):
     def __init__(
         self,
         session: AsyncSession,
-        stmt: object,
+        stmt: Select[Any],
         params: RowMapping | None = None,
     ) -> None:
         self._session = session
@@ -219,11 +224,11 @@ class _AsyncSqlAlchemyScalarResult[T: DeclarativeBase](_AsyncScalarResult[T]):
         self._params = params or {}
 
     async def all(self) -> list[T]:
-        result = await self._session.scalars(self._stmt, self._params)
+        result = await self._session.scalars(self._stmt, cast(Mapping[str, Any], self._params))
         return list(result.all())
 
     async def first(self) -> T | None:
-        result = await self._session.scalars(self._stmt.limit(1), self._params)
+        result = await self._session.scalars(self._stmt.limit(1), cast(Mapping[str, Any], self._params))
         return result.first()
 
 
@@ -231,7 +236,7 @@ class AsyncSqlAlchemyStatementBuilder[T: DeclarativeBase](AsyncStatementQueryBui
     def __init__(self, session: AsyncSession, entity_class: type[T]) -> None:
         self._session = session
         self._entity_class = entity_class
-        self._stmt = select(entity_class)
+        self._stmt: Select[Any] = select(entity_class)
         self._params: RowMapping = {}
 
     def select_entity(self) -> AsyncSqlAlchemyStatementBuilder[T]:
@@ -242,18 +247,18 @@ class AsyncSqlAlchemyStatementBuilder[T: DeclarativeBase](AsyncStatementQueryBui
         self._stmt = select(self._entity_class.__table__)
         return self
 
-    def select_columns(self, *columns: object) -> AsyncSqlAlchemyStatementBuilder[T]:
+    def select_columns(self, *columns: SqlClause) -> AsyncSqlAlchemyStatementBuilder[T]:
         self._stmt = select(*columns)
         return self
 
-    def select_from(self, from_clause: object) -> AsyncSqlAlchemyStatementBuilder[T]:
+    def select_from(self, from_clause: SqlClause) -> AsyncSqlAlchemyStatementBuilder[T]:
         self._stmt = self._stmt.select_from(from_clause)
         return self
 
     def join(
         self,
-        target: object,
-        onclause: object | None = None,
+        target: SqlClause,
+        onclause: SqlClause | None = None,
         *,
         isouter: bool = False,
     ) -> AsyncSqlAlchemyStatementBuilder[T]:
@@ -265,8 +270,8 @@ class AsyncSqlAlchemyStatementBuilder[T: DeclarativeBase](AsyncStatementQueryBui
 
     def outerjoin(
         self,
-        target: object,
-        onclause: object | None = None,
+        target: SqlClause,
+        onclause: SqlClause | None = None,
     ) -> AsyncSqlAlchemyStatementBuilder[T]:
         if onclause is not None:
             self._stmt = self._stmt.outerjoin(target, onclause)
@@ -278,33 +283,33 @@ class AsyncSqlAlchemyStatementBuilder[T: DeclarativeBase](AsyncStatementQueryBui
         self._stmt = self._stmt.where(*criteria)
         return self
 
-    def filter_by(self, **kwargs: object) -> AsyncSqlAlchemyStatementBuilder[T]:
+    def filter_by(self, **kwargs: Any) -> AsyncSqlAlchemyStatementBuilder[T]:
         self._stmt = self._stmt.filter_by(**kwargs)
         return self
 
-    def distinct(self, *columns: object) -> AsyncSqlAlchemyStatementBuilder[T]:
+    def distinct(self, *columns: SqlClause) -> AsyncSqlAlchemyStatementBuilder[T]:
         self._stmt = self._stmt.distinct(*columns)
         return self
 
-    def group_by(self, *clauses: object) -> AsyncSqlAlchemyStatementBuilder[T]:
+    def group_by(self, *clauses: SqlClause) -> AsyncSqlAlchemyStatementBuilder[T]:
         self._stmt = self._stmt.group_by(*clauses)
         return self
 
-    def correlate(self, *from_clauses: object) -> AsyncSqlAlchemyStatementBuilder[T]:
+    def correlate(self, *from_clauses: SqlClause) -> AsyncSqlAlchemyStatementBuilder[T]:
         self._stmt = self._stmt.correlate(*from_clauses)
         return self
 
-    def correlate_except(self, *from_clauses: object) -> AsyncSqlAlchemyStatementBuilder[T]:
+    def correlate_except(self, *from_clauses: SqlClause) -> AsyncSqlAlchemyStatementBuilder[T]:
         self._stmt = self._stmt.correlate_except(*from_clauses)
         return self
 
-    def as_lateral(self, name: str) -> object:
+    def as_lateral(self, name: str) -> SqlClause:
         return self._stmt.lateral(name)
 
-    def as_cte(self, name: str) -> object:
+    def as_cte(self, name: str) -> SqlClause:
         return self._stmt.cte(name)
 
-    def order_by(self, *clauses: object) -> AsyncSqlAlchemyStatementBuilder[T]:
+    def order_by(self, *clauses: SqlClause) -> AsyncSqlAlchemyStatementBuilder[T]:
         self._stmt = self._stmt.order_by(*clauses)
         return self
 
@@ -330,7 +335,7 @@ class AsyncSqlAlchemyStatementBuilder[T: DeclarativeBase](AsyncStatementQueryBui
     def with_for_update(
         self,
         *,
-        of: object | None = None,
+        of: SqlClause | None = None,
         skip_locked: bool = False,
     ) -> AsyncSqlAlchemyStatementBuilder[T]:
         if of is not None:
@@ -350,23 +355,23 @@ class AsyncSqlAlchemyStatementBuilder[T: DeclarativeBase](AsyncStatementQueryBui
         elif froms:
             from_clause = froms[0]
         else:
-            from_clause = self._entity_class
+            from_clause = self._entity_class.__table__
         count_stmt = select(func.count()).select_from(from_clause)
         if self._stmt.whereclause is not None:
             count_stmt = count_stmt.where(self._stmt.whereclause)
-        result = await self._session.execute(count_stmt, self._params)
+        result = await self._session.execute(count_stmt, cast(Mapping[str, Any], self._params))
         return int(result.scalar_one() or 0)
 
-    async def count_distinct(self, *columns: object) -> int:
+    async def count_distinct(self, *columns: SqlClause) -> int:
         count_stmt = select(func.count(func.distinct(*columns)))
         count_stmt = count_stmt.select_from(*self._stmt.get_final_froms())
         if self._stmt.whereclause is not None:
             count_stmt = count_stmt.where(self._stmt.whereclause)
-        result = await self._session.execute(count_stmt, self._params)
+        result = await self._session.execute(count_stmt, cast(Mapping[str, Any], self._params))
         return int(result.scalar_one() or 0)
 
-    async def scalar(self) -> object | None:
-        result = await self._session.execute(self._stmt, self._params)
+    async def scalar(self) -> Any | None:
+        result = await self._session.execute(self._stmt, cast(Mapping[str, Any], self._params))
         return result.scalar_one()
 
     def mappings(self) -> _AsyncSqlAlchemyMappingResult:

@@ -4,7 +4,11 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import date
 from datetime import datetime
+from typing import Any
+from typing import cast
 from uuid import UUID
+from sqlalchemy.engine import Result
+from sqlalchemy.engine.cursor import CursorResult
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.sql import ColumnElement
 from sqlalchemy.sql import Select
@@ -25,6 +29,7 @@ __all__ = [
     "RowMapping",
     "RowValue",
     "SqlBindParams",
+    "SqlClause",
     "SqlFilter",
     "SqlFilters",
     "SqlFromClause",
@@ -47,6 +52,7 @@ type PrimaryKey = int | str | UUID
 type IdList = list[PrimaryKey]
 
 type SqlBindParams = dict[str, RowValue]
+type SqlClause = Any
 type SqlFilter = ColumnElement[bool]
 type SqlFilters = list[SqlFilter]
 type SqlOrderColumn = ColumnElement[object]
@@ -59,3 +65,8 @@ type SqlTable = TableClause
 type RowMapping = Mapping[str, RowValue]
 
 type OrmModel = type[DeclarativeBase]
+
+
+def cursor_rowcount(result: Result[Any]) -> int:
+    """Return affected row count from a DML ``execute`` result."""
+    return int(cast(CursorResult[Any], result).rowcount or 0)
