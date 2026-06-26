@@ -1,97 +1,75 @@
-# Releasing sqlphilosophy
+# Releasing `sqlphilosophy`
 
-This directory is the **publishable Python package** (`pip install sqlphilosophy`). It can ship as a standalone public GitHub repository and to PyPI.
+Standalone repository: [SignalSafeSoftware/sqlphilosophy](https://github.com/SignalSafeSoftware/sqlphilosophy).
 
-## One-time setup
+## CI publish policy
 
-### 1. Create the public GitHub repository
+- **Checks and tests** run on every pull request.
+- **`scan` (Sonar)** on pull requests is **optional** — it runs only when the PR has the **`scan`** label. On **`push`** (including **`v*`** tag pushes) and **`workflow_dispatch`**, **`scan`** runs automatically.
+- **Publish does not run** from PR labels.
+- **Publish runs** when:
+  - **Manual:** GitHub Actions → **CI** → **Run workflow** on branch **`main`**, or
+  - **Tag:** push a semver tag matching `v*` (for example `vX.Y.Z`).
+- **Publish requires** successful **`checks`**, **`tests`**, and **`scan`** jobs in the same workflow run (see [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)).
+- Pushing a **`v*`** tag starts a workflow run where **`checks`**, **`tests`**, and **`scan`** run before **Publish** can proceed.
+- **GitHub Releases do not trigger publish** in the current workflow.
+- **PyPI trusted publishing** uses GitHub Environment **`pypi`**. npm-style provenance and npm Environment approval do not apply.
 
-From the monorepo root (or after running `scripts/export-sqlphilosophy-standalone.sh`):
+## Before you release
 
-```bash
-gh repo create SignalSafeSoftware/sqlphilosophy --public --source=. --remote=origin --push
-```
-
-Recommended remote: `https://github.com/SignalSafeSoftware/sqlphilosophy`
-
-The standalone export includes `.github/workflows/ci.yml` and `publish.yml`.
-
-### 2. Register the PyPI project
-
-1. Create an account at [pypi.org](https://pypi.org) if needed.
-2. Reserve the project name **`sqlphilosophy`** (must match `pyproject.toml` `[project].name`).
-3. Enable **trusted publishing** for the GitHub repo:
-   - PyPI → Account settings → Publishing → Add a new pending publisher
-   - Owner: `SignalSafeSoftware`, repository: `sqlphilosophy`, workflow: `publish.yml`, environment: `pypi`
-4. In the GitHub repo, create an environment named **`pypi`** (Settings → Environments). No secrets required when using trusted publishing.
-
-### 3. Monorepo consumers
-
-DeliveryPlus continues to use the path dependency in root `pyproject.toml`:
-
-```toml
-sqlphilosophy = { path = "libs/sqlphilosophy", develop = true }
-```
-
-Released versions can also be pinned from PyPI when you choose to decouple.
-
-## Version bump
-
-Version lives in `src/sqlphilosophy/VERSION` (single line, semver).
-
-From monorepo root:
-
-```bash
-bash scripts/bump-python-repository-version.sh patch   # or minor | major
-```
-
-Update `CHANGELOG.md` for the release.
-
-## Pre-release checks
-
-From **this directory** (`libs/sqlphilosophy`):
-
-```bash
-python -m pip install -e ".[dev]"
-python -m pytest -q
-python -m pip install build twine
-python -m build
-twine check dist/*
-```
-
-From monorepo root:
-
-```bash
-./scripts/run_package.sh python-repository verify
-./scripts/run_package.sh python-repository wheel
-./scripts/smoke-python-repository-wheel.sh
-```
-
-## Publish to PyPI (recommended: GitHub Release)
-
-1. Commit version bump + changelog.
-2. Tag and push:
+1. Bump version in [`src/sqlphilosophy/VERSION`](./src/sqlphilosophy/VERSION) (single line, semver).
+2. Update [CHANGELOG.md](./CHANGELOG.md) (`[Unreleased]` → new version section when tagging).
+3. Run locally:
 
    ```bash
-   git tag sqlphilosophy-v0.1.0
-   git push origin sqlphilosophy-v0.1.0
+   uv sync --extra dev
+   uv run pytest
+   uv run python -m build
+   uv run twine check dist/*
    ```
 
-   In the **standalone** repo, use `v0.1.0` instead of `sqlphilosophy-v0.1.0`.
+4. Run artifact smoke test: `uv run python scripts/smoke_package.py` (build, `twine check`, wheel install, import/`py.typed` checks — enforced in CI before publish).
 
-3. Create a GitHub Release from the tag (Publish release). That triggers `.github/workflows/publish.yml`.
+## Publish
 
-## Manual PyPI upload (fallback)
+1. Commit the version and changelog updates on **`main`**:
+
+   ```bash
+   git add src/sqlphilosophy/VERSION CHANGELOG.md
+   git commit -m "Release vX.Y.Z"
+   git push origin main
+   ```
+
+2. Tag and push (recommended — triggers **Publish** when required jobs succeed):
+
+   ```bash
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
+   ```
+
+   **Option B — Manual dispatch:** merge release commits to **`main`**, then GitHub → **Actions** → **CI** → **Run workflow** (branch **`main`**). Ensure [`VERSION`](./src/sqlphilosophy/VERSION) matches the tag you intend to ship.
+
+## After publish
 
 ```bash
-cd libs/sqlphilosophy
-python -m build
-TWINE_USERNAME=__token__ TWINE_PASSWORD=pypi-... python -m twine upload dist/*
+pip index versions sqlphilosophy
 ```
 
-Use an API token with scope limited to this project.
+CI runs `scripts/smoke_package.py` before publish.
 
-## Package boundaries
+## One-time PyPI setup
 
-- No imports from `phobos`, `backend`, `vega`, Django, or Celery.
-- Enforced by `tests/test_package_boundaries.py` and monorepo `backend/shared/tests/policy/test_sqlphilosophy_package_boundaries.py`.
+1. Register **`sqlphilosophy`** on PyPI.
+2. Configure **trusted publishing** for owner `SignalSafeSoftware`, repository `sqlphilosophy`, workflow **`ci.yml`**, environment **`pypi`**.
+3. Create GitHub Environment **`pypi`**.
+
+## Manual upload (fallback)
+
+Only if CI publish is unavailable:
+
+```bash
+uv run python -m build
+TWINE_USERNAME=__token__ TWINE_PASSWORD=<pypi-api-token> uv run twine upload dist/*
+```
+
+Use a project-scoped API token.
