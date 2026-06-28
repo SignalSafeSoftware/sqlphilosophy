@@ -25,13 +25,13 @@ jobs:
             matrix:
                 python-version: ["3.12", "3.13"]
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
-            - uses: actions/setup-python@v5
+            - uses: actions/setup-python@v6
               with:
                   python-version: ${{ matrix.python-version }}
 
-            - uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081 # v5
+            - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
               with:
                   enable-cache: true
 
@@ -62,13 +62,13 @@ jobs:
             matrix:
                 python-version: ["3.12", "3.13"]
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
-            - uses: actions/setup-python@v5
+            - uses: actions/setup-python@v6
               with:
                   python-version: ${{ matrix.python-version }}
 
-            - uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081 # v5
+            - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
               with:
                   enable-cache: true
 
@@ -84,7 +84,7 @@ jobs:
 
             - name: Upload coverage
               if: matrix.python-version == '3.12'
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v7
               with:
                   name: coverage
                   path: coverage.xml
@@ -93,9 +93,12 @@ jobs:
         name: Scan
         needs: [tests]
         if: |
-            github.event_name == 'workflow_dispatch' ||
-            github.event_name == 'push' ||
-            (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'scan'))
+            (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+            (
+                github.event_name == 'workflow_dispatch' ||
+                github.event_name == 'push' ||
+                (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'scan'))
+            )
         runs-on: ubuntu-latest
         permissions:
             contents: read
@@ -103,12 +106,12 @@ jobs:
         env:
             SONAR_TOKEN: ${{ secrets.PACKAGES_SONAR_TOKEN }}
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
               with:
                   fetch-depth: 0
 
             - name: Download coverage
-              uses: actions/download-artifact@v4
+              uses: actions/download-artifact@v8
               with:
                   name: coverage
                   path: .
@@ -117,7 +120,9 @@ jobs:
               run: test -f coverage.xml
 
             - name: SonarCloud scan
-              uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995
+              uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
+              env:
+                  SONAR_TOKEN: ${{ secrets.PACKAGES_SONAR_TOKEN }}
 
             - name: Sonar PR comment
               if: github.event_name == 'pull_request'
@@ -137,13 +142,13 @@ jobs:
         needs: [checks, tests]
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
-            - uses: actions/setup-python@v5
+            - uses: actions/setup-python@v6
               with:
                   python-version: "3.12"
 
-            - uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081 # v5
+            - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
               with:
                   enable-cache: true
 
@@ -167,20 +172,20 @@ jobs:
             ) &&
             needs.checks.result == 'success' &&
             needs.tests.result == 'success' &&
-            needs.scan.result == 'success'
+            (needs.scan.result == 'success' || needs.scan.result == 'skipped')
         runs-on: ubuntu-latest
         permissions:
             contents: read
             id-token: write
         environment: pypi
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
-            - uses: actions/setup-python@v5
+            - uses: actions/setup-python@v6
               with:
                   python-version: "3.12"
 
-            - uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081 # v5
+            - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
               with:
                   enable-cache: true
 
