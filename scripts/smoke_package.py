@@ -7,6 +7,7 @@ import importlib
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import zipfile
 from pathlib import Path
@@ -75,11 +76,17 @@ def verify_sdist_contents(dist_dir: Path) -> None:
     if not sdists:
         raise SystemExit("smoke_package: no sdist produced")
 
-    listing = subprocess.check_output(["tar", "-tf", str(sdists[0])], text=True).splitlines()
+    with tarfile.open(sdists[0], "r:*") as archive:
+        listing = archive.getnames()
+
     required_suffixes = ("README.md", "LICENSE", "py.typed", "VERSION")
-    for suffix in required_suffixes:
-        if not any(entry.endswith(suffix) for entry in listing):
-            raise SystemExit(f"smoke_package: sdist missing {suffix}")
+    missing = [
+        suffix
+        for suffix in required_suffixes
+        if not any(path.endswith(suffix) for path in listing)
+    ]
+    if missing:
+        raise SystemExit(f"smoke_package: sdist is missing required files: {missing}")
 
     test_paths = [entry for entry in listing if "/tests/" in entry or entry.endswith("/tests/")]
     if test_paths:
