@@ -7,6 +7,7 @@ import importlib
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import zipfile
 from pathlib import Path
@@ -45,6 +46,8 @@ def main() -> None:
 
     run([sys.executable, "-m", "twine", "check", "dist/*"])
 
+    verify_sdist_contents(dist_dir)
+
     venv_dir = Path(tempfile.mkdtemp(prefix="smoke-venv-"))
     try:
         run([sys.executable, "-m", "venv", str(venv_dir)])
@@ -66,6 +69,32 @@ def main() -> None:
     finally:
         shutil.rmtree(venv_dir, ignore_errors=True)
         shutil.rmtree(dist_dir, ignore_errors=True)
+
+
+def verify_sdist_contents(dist_dir: Path) -> None:
+    sdists = sorted(dist_dir.glob("*.tar.gz"))
+    if not sdists:
+        raise SystemExit("smoke_package: no sdist produced")
+
+    with tarfile.open(sdists[0], "r:*") as archive:
+        listing = archive.getnames()
+
+    required_suffixes = ("README.md", "LICENSE", "py.typed", "VERSION")
+    missing = [
+        suffix
+        for suffix in required_suffixes
+        if not any(path.endswith(suffix) for path in listing)
+    ]
+    if missing:
+        raise SystemExit(f"smoke_package: sdist is missing required files: {missing}")
+
+    test_paths = [entry for entry in listing if "/tests/" in entry or entry.endswith("/tests/")]
+    if test_paths:
+        raise SystemExit(
+            f"smoke_package: sdist contains tests ({len(test_paths)} path(s), e.g. {test_paths[0]})",
+        )
+
+    print(f"sdist contents audit OK ({len(listing)} paths)")
 
 
 def verify_py_typed(wheel: Path) -> None:
