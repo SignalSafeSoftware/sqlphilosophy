@@ -93,7 +93,7 @@ jobs:
         name: Scan
         needs: [tests]
         if: |
-            (secrets.SONAR_TOKEN != '' || secrets.PACKAGES_SONAR_TOKEN != '') &&
+            secrets.PACKAGES_SONAR_TOKEN != '' &&
             (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
             (
                 github.event_name == 'workflow_dispatch' ||
@@ -105,7 +105,7 @@ jobs:
             contents: read
             pull-requests: write
         env:
-            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN != '' && secrets.SONAR_TOKEN || secrets.PACKAGES_SONAR_TOKEN }}
+            SONAR_TOKEN: ${{ secrets.PACKAGES_SONAR_TOKEN }}
         steps:
             - uses: actions/checkout@v7
               with:
@@ -123,7 +123,7 @@ jobs:
             - name: SonarCloud scan
               uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
               env:
-                  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN != '' && secrets.SONAR_TOKEN || secrets.PACKAGES_SONAR_TOKEN }}
+                  SONAR_TOKEN: ${{ secrets.PACKAGES_SONAR_TOKEN }}
 
             - name: Sonar PR comment
               if: github.event_name == 'pull_request'
