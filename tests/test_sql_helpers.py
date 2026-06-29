@@ -110,14 +110,41 @@ def test_get_column_value_unmapped() -> None:
         get_column_value(object())
 
 
+def test_get_column_value_inspect_model_raises() -> None:
+    from unittest.mock import patch
+
+    class DuckEntity:
+        __mapper__ = object()
+
+    with patch(
+        "sqlphilosophy.sync.repository.BaseRepository.inspect_model",
+        side_effect=ValueError("boom"),
+    ):
+        with pytest.raises(TypeError, match="not a mapped SQLAlchemy entity"):
+            get_column_value(DuckEntity())
+
+
+def test_mapped_model_class_for_non_type_candidate() -> None:
+    from unittest.mock import MagicMock
+
+    from sqlphilosophy.sql import _mapped_model_class_for
+
+    entity = MagicMock()
+    entity.__class__ = 42
+    assert _mapped_model_class_for(entity) is None
+
+
 def test_get_column_value_missing_mapper_attribute() -> None:
     from unittest.mock import MagicMock
     from unittest.mock import patch
 
+    class DuckEntity:
+        __mapper__ = object()
+
     with patch("sqlphilosophy.sync.repository.BaseRepository.inspect_model") as inspect_model:
         inspect_model.return_value = MagicMock(spec=[])
         with pytest.raises(TypeError, match="not a mapped SQLAlchemy entity"):
-            get_column_value(object())
+            get_column_value(DuckEntity())
 
 
 def test_row_mapping_helpers(sync_session: Session) -> None:

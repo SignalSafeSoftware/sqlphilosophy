@@ -17,6 +17,7 @@ from sqlalchemy import desc
 from sqlalchemy import func
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import literal_column
+from sqlalchemy.exc import NoInspectionAvailable
 from sqlalchemy import select
 from sqlalchemy import update
 from sqlalchemy.orm import DeclarativeBase
@@ -42,6 +43,21 @@ from sqlphilosophy.types import SqlTable
 _ModelT = TypeVar("_ModelT", bound=DeclarativeBase)
 
 
+def _mapped_model_class_for(value: object) -> type[DeclarativeBase] | None:
+    candidate: object = value if isinstance(value, type) else value.__class__
+
+    if not isinstance(candidate, type):
+        return None
+
+    try:
+        sa_inspect(candidate)
+    except NoInspectionAvailable:
+        if not hasattr(candidate, "__mapper__"):
+            return None
+
+    return cast(type[DeclarativeBase], candidate)
+
+
 def sql_table(table_name: str, *column_names: str) -> SqlTable:
     """Lightweight Core table — prefer ORM models unless you need Core performance."""
     return table(table_name, *[column(c) for c in column_names])
@@ -55,8 +71,11 @@ def get_column_value(entity: object) -> ApiObject:
     else:
         from sqlphilosophy.sync.repository import BaseRepository
 
+        model_cls = _mapped_model_class_for(entity)
+        if model_cls is None:
+            raise TypeError(f"{type(entity)!r} is not a mapped SQLAlchemy entity")
         try:
-            insp = BaseRepository.inspect_model(type(entity))
+            insp = BaseRepository.inspect_model(model_cls)
         except Exception as exc:
             raise TypeError(f"{type(entity)!r} is not a mapped SQLAlchemy entity") from exc
         if not hasattr(insp, "mapper"):
