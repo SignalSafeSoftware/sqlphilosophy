@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-06-28
+
+### Fixed
+
+- `get_column_value`: inspect ORM instances via instance state first, then fall back to `BaseRepository.inspect_model` so joined-row entity unwrapping works with duck-typed test doubles and real mapped instances.
+- `BaseRepository.fetch_mappings_page` (sync): delegate to `fetch_statement_mappings` with limit/offset, matching async behavior and allowing repository-level overrides in tests and subclasses.
+
 ## [0.1.3] - 2026-06-28
 
 ### Changed
@@ -55,7 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [RELEASING.md](./RELEASING.md) aligned with current **CI** publish job (not a separate `publish.yml`).
 
-[Unreleased]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/SignalSafeSoftware/sqlphilosophy/releases/tag/v0.1.2
 [0.1.0]: https://github.com/SignalSafeSoftware/sqlphilosophy/releases/tag/v0.1.0

@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.interfaces import LoaderOption
 from sqlphilosophy.sorting import ListQuery
 from sqlphilosophy.sorting import SortConfig
-from sqlphilosophy.sql import apply_mappings_page
 from sqlphilosophy.sql import delete_by_ids_model
 from sqlphilosophy.sql import partial_update_model
 from sqlphilosophy.sql import rows_mapping
@@ -114,13 +113,11 @@ class BaseRepository[T: DeclarativeBase]:
         params: RowMapping | None = None,
     ) -> list[RowMapping]:
         """Execute ``stmt`` with limit/offset; return normalized row mappings."""
-        return apply_mappings_page(
-            self.session,
-            stmt,
-            limit=limit,
-            offset=offset,
-            params=params,
-        )
+        if limit < 0:
+            raise ValueError("limit must be >= 0")
+        if offset < 0:
+            raise ValueError("offset must be >= 0")
+        return self.fetch_statement_mappings(stmt.limit(limit).offset(offset), params)
 
     def fetch_sorted_mappings(
         self,

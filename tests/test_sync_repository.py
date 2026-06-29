@@ -143,6 +143,28 @@ def test_fetch_helpers(sync_session: Session) -> None:
     assert repo.fetch_mapping_one(stmt.select_from(Widget).where(Widget.id == rows[0]["id"]))
 
 
+def test_fetch_mappings_page_delegates_to_fetch_statement_mappings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from sqlalchemy import select
+
+    repo = BaseRepository(Widget, MagicMock())
+    expected = [{"id": 1}]
+    monkeypatch.setattr(repo, "fetch_statement_mappings", lambda _stmt, _params=None: expected)
+    rows = repo.fetch_mappings_page(select(Widget.id), limit=10, offset=20)
+    assert rows == expected
+
+
+def test_fetch_mappings_page_rejects_negative_limit_or_offset() -> None:
+    from sqlalchemy import select
+
+    repo = BaseRepository(Widget, MagicMock())
+    with pytest.raises(ValueError, match="limit must be >= 0"):
+        repo.fetch_mappings_page(select(Widget.id), limit=-1, offset=0)
+    with pytest.raises(ValueError, match="offset must be >= 0"):
+        repo.fetch_mappings_page(select(Widget.id), limit=1, offset=-1)
+
+
 def test_exists_helpers(sync_session: Session) -> None:
     repo = BaseRepository(Widget, sync_session)
     row = repo.create(name="exists")

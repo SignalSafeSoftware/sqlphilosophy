@@ -49,10 +49,20 @@ def sql_table(table_name: str, *column_names: str) -> SqlTable:
 
 def get_column_value(entity: object) -> ApiObject:
     """Return mapped column values for an ORM entity instance."""
-    insp = sa_inspect(type(entity), raiseerr=False)
-    if insp is None:
-        raise TypeError(f"{type(entity)!r} is not a mapped SQLAlchemy entity")
-    return {attr.key: getattr(entity, attr.key) for attr in insp.mapper.column_attrs}
+    instance_state = sa_inspect(entity, raiseerr=False)
+    if instance_state is not None and hasattr(instance_state, "mapper"):
+        mapper = instance_state.mapper
+    else:
+        from sqlphilosophy.sync.repository import BaseRepository
+
+        try:
+            insp = BaseRepository.inspect_model(type(entity))
+        except Exception as exc:
+            raise TypeError(f"{type(entity)!r} is not a mapped SQLAlchemy entity") from exc
+        if not hasattr(insp, "mapper"):
+            raise TypeError(f"{type(entity)!r} is not a mapped SQLAlchemy entity")
+        mapper = insp.mapper
+    return {attr.key: getattr(entity, attr.key) for attr in mapper.column_attrs}
 
 
 def row_mapping(row: object) -> RowMapping:
