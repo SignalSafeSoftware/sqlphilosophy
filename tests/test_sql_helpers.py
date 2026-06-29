@@ -173,6 +173,9 @@ def test_row_mapping_unwraps_duck_typed_entity() -> None:
     class LabeledKey:
         key = "title"
 
+        def __eq__(self, other: object) -> bool:
+            return isinstance(other, LabeledKey) and self.key == other.key
+
         def __hash__(self) -> int:
             return hash("title")
 
