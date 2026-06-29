@@ -17,6 +17,7 @@ from sqlalchemy import desc
 from sqlalchemy import func
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import literal_column
+from sqlalchemy.exc import NoInspectionAvailable
 from sqlalchemy import select
 from sqlalchemy import update
 from sqlalchemy.orm import DeclarativeBase
@@ -42,6 +43,21 @@ from sqlphilosophy.types import SqlTable
 _ModelT = TypeVar("_ModelT", bound=DeclarativeBase)
 
 
+def _mapped_model_class_for(value: object) -> type[DeclarativeBase] | None:
+    candidate: object = value if isinstance(value, type) else value.__class__
+
+    if not isinstance(candidate, type):
+        return None
+
+    try:
+        sa_inspect(candidate)
+    except NoInspectionAvailable:
+        if not hasattr(candidate, "__mapper__"):
+            return None
+
+    return cast(type[DeclarativeBase], candidate)
+
+
 def sql_table(table_name: str, *column_names: str) -> SqlTable:
     """Lightweight Core table — prefer ORM models unless you need Core performance."""
     return table(table_name, *[column(c) for c in column_names])
@@ -49,10 +65,23 @@ def sql_table(table_name: str, *column_names: str) -> SqlTable:
 
 def get_column_value(entity: object) -> ApiObject:
     """Return mapped column values for an ORM entity instance."""
-    insp = sa_inspect(type(entity), raiseerr=False)
-    if insp is None:
-        raise TypeError(f"{type(entity)!r} is not a mapped SQLAlchemy entity")
-    return {attr.key: getattr(entity, attr.key) for attr in insp.mapper.column_attrs}
+    instance_state = sa_inspect(entity, raiseerr=False)
+    if instance_state is not None and hasattr(instance_state, "mapper"):
+        mapper = instance_state.mapper
+    else:
+        from sqlphilosophy.sync.repository import BaseRepository
+
+        model_cls = _mapped_model_class_for(entity)
+        if model_cls is None:
+            raise TypeError(f"{type(entity)!r} is not a mapped SQLAlchemy entity")
+        try:
+            insp = BaseRepository.inspect_model(model_cls)
+        except Exception as exc:
+            raise TypeError(f"{type(entity)!r} is not a mapped SQLAlchemy entity") from exc
+        if not hasattr(insp, "mapper"):
+            raise TypeError(f"{type(entity)!r} is not a mapped SQLAlchemy entity")
+        mapper = insp.mapper
+    return {attr.key: getattr(entity, attr.key) for attr in mapper.column_attrs}
 
 
 def row_mapping(row: object) -> RowMapping:

@@ -110,6 +110,43 @@ def test_get_column_value_unmapped() -> None:
         get_column_value(object())
 
 
+def test_get_column_value_inspect_model_raises() -> None:
+    from unittest.mock import patch
+
+    class DuckEntity:
+        __mapper__ = object()
+
+    with patch(
+        "sqlphilosophy.sync.repository.BaseRepository.inspect_model",
+        side_effect=ValueError("boom"),
+    ):
+        with pytest.raises(TypeError, match="not a mapped SQLAlchemy entity"):
+            get_column_value(DuckEntity())
+
+
+def test_mapped_model_class_for_non_type_candidate() -> None:
+    from unittest.mock import MagicMock
+
+    from sqlphilosophy.sql import _mapped_model_class_for
+
+    entity = MagicMock()
+    entity.__class__ = 42
+    assert _mapped_model_class_for(entity) is None
+
+
+def test_get_column_value_missing_mapper_attribute() -> None:
+    from unittest.mock import MagicMock
+    from unittest.mock import patch
+
+    class DuckEntity:
+        __mapper__ = object()
+
+    with patch("sqlphilosophy.sync.repository.BaseRepository.inspect_model") as inspect_model:
+        inspect_model.return_value = MagicMock(spec=[])
+        with pytest.raises(TypeError, match="not a mapped SQLAlchemy entity"):
+            get_column_value(DuckEntity())
+
+
 def test_row_mapping_helpers(sync_session: Session) -> None:
     row = Widget(name="map")
     sync_session.add(row)
@@ -119,6 +156,38 @@ def test_row_mapping_helpers(sync_session: Session) -> None:
     assert row_mapping(None) == {}
     assert row_mapping_opt(None) is None
     assert rows_mapping([{"id": 1}]) == [{"id": 1}]
+
+
+def test_row_mapping_unwraps_duck_typed_entity() -> None:
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    class FakeMapper:
+        column_attrs = [SimpleNamespace(key="id"), SimpleNamespace(key="email")]
+
+    class FakeEntity:
+        __mapper__ = object()
+        id = 5
+        email = "x@y.z"
+
+    class LabeledKey:
+        key = "title"
+
+        def __eq__(self, other: object) -> bool:
+            return isinstance(other, LabeledKey) and self.key == other.key
+
+        def __hash__(self) -> int:
+            return hash("title")
+
+    entity = FakeEntity()
+    labeled = LabeledKey()
+    with patch("sqlphilosophy.sync.repository.BaseRepository.inspect_model") as inspect_model:
+        inspect_model.return_value.mapper = FakeMapper()
+        row = SimpleNamespace(_mapping={"user": entity, labeled: "Phish"})
+        mapped = row_mapping(row)
+    assert mapped["id"] == 5
+    assert mapped["email"] == "x@y.z"
+    assert mapped["title"] == "Phish"
 
 
 def test_apply_mappings_page(sync_session: Session) -> None:
