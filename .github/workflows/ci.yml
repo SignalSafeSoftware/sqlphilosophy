@@ -126,7 +126,7 @@ jobs:
 
             - name: Sonar PR comment
               if: github.event_name == 'pull_request'
-              uses: actions/github-script@v7
+              uses: actions/github-script@v9
               with:
                   script: |
                       const body = `SonarCloud analysis for \`sqlphilosophy\` (\`SignalSafeSoftware_sqlphilosophy\`) completed with result \`${{ job.status }}\`.`;
