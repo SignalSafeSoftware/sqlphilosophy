@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 from typing import cast
+from typing import Optional
 from sqlalchemy import delete
 from sqlalchemy import func
 from sqlalchemy import inspect as sa_inspect
@@ -31,7 +32,7 @@ from sqlphilosophy.types import cursor_rowcount
 LoadRelations = Sequence[LoaderOption]
 
 
-class AsyncBaseRepository[T: DeclarativeBase]:
+class AsyncBaseRepository[T: DeclarativeBase, U: Optional[AsyncRepositoryFactory]]:
     """Async session-scoped CRUD helpers for a single mapped model."""
 
     def __init__(
@@ -41,7 +42,7 @@ class AsyncBaseRepository[T: DeclarativeBase]:
         factory: AsyncRepositoryFactory | None = None,
     ) -> None:
         self.model = model
-        self.session = session
+        self._session = session
         self._factory = factory
         pk_cols = self.inspect_model(model).primary_key
         if len(pk_cols) != 1:
@@ -59,7 +60,7 @@ class AsyncBaseRepository[T: DeclarativeBase]:
 
     async def list_table_names(self) -> frozenset[str]:
         """Return visible table names on the session connection."""
-        connection = await self.session.connection()
+        connection = await self._session.connection()
 
         def _names(sync_conn: object) -> frozenset[str]:
             insp = sa_inspect(sync_conn)
@@ -79,7 +80,7 @@ class AsyncBaseRepository[T: DeclarativeBase]:
         return stmt
 
     async def _scalar_result(self, stmt: Any, *, unique: bool = False) -> Any:
-        result = await self.session.scalars(stmt)
+        result = await self._session.scalars(stmt)
         if unique:
             return result.unique()
         return result
@@ -88,19 +89,19 @@ class AsyncBaseRepository[T: DeclarativeBase]:
         self, stmt: Any, params: RowMapping | None = None
     ) -> list[RowMapping]:
         """Execute ``stmt`` and return all rows as mappings."""
-        result = await self.session.execute(stmt, params or {})
+        result = await self._session.execute(stmt, params or {})
         mapped = result.mappings()
         rows = mapped.all() if hasattr(mapped, "all") else mapped
         return rows_mapping(rows)
 
     async def scalar_count(self, stmt: SqlSelect, params: SqlBindParams | None = None) -> int:
         """Execute a scalar count/select statement and return ``int``."""
-        result = await self.session.execute(stmt, params or {})
+        result = await self._session.execute(stmt, params or {})
         return int(result.scalar_one())
 
     async def iter_mappings(self, stmt: SqlSelect, params: SqlBindParams | None = None):
         """Yield each result row as a plain ``dict``."""
-        result = await self.session.execute(stmt, params or {})
+        result = await self._session.execute(stmt, params or {})
         for row in result.mappings():
             yield dict(row)
 
@@ -108,7 +109,7 @@ class AsyncBaseRepository[T: DeclarativeBase]:
         self, stmt: SqlSelect, params: SqlBindParams | None = None
     ) -> RowMapping | None:
         """Execute ``stmt`` and return the first row as a mapping, or ``None``."""
-        result = await self.session.execute(stmt, params or {})
+        result = await self._session.execute(stmt, params or {})
         row = result.mappings().first()
         return dict(row) if row is not None else None
 
@@ -116,7 +117,7 @@ class AsyncBaseRepository[T: DeclarativeBase]:
         self, stmt: SqlSelect, params: SqlBindParams | None = None
     ) -> RowMapping:
         """Execute ``stmt`` and return exactly one row as a mapping."""
-        result = await self.session.execute(stmt, params or {})
+        result = await self._session.execute(stmt, params or {})
         return dict(result.mappings().one())
 
     async def fetch_mappings_page(
@@ -159,7 +160,7 @@ class AsyncBaseRepository[T: DeclarativeBase]:
         """Fetch a single record by primary key with optional eager loading."""
         stmt = select(self.model).where(self._pk_column == obj_id)
         stmt = self._apply_load_relations(stmt, load_relations)
-        result = await self.session.scalars(stmt)
+        result = await self._session.scalars(stmt)
         return result.first()
 
     async def exists(self, obj_id: PrimaryKey) -> bool:
@@ -175,7 +176,7 @@ class AsyncBaseRepository[T: DeclarativeBase]:
         stmt = select(func.count()).select_from(self.model)
         if filters:
             stmt = stmt.filter_by(**filters)
-        result = await self.session.scalar(stmt)
+        result = await self._session.scalar(stmt)
         return int(result or 0)
 
     async def first(
@@ -184,7 +185,7 @@ class AsyncBaseRepository[T: DeclarativeBase]:
         """Return the first row matching filters, with optional eager loading."""
         stmt = select(self.model).filter_by(**filters).limit(1)
         stmt = self._apply_load_relations(stmt, load_relations)
-        result = await self.session.scalars(stmt)
+        result = await self._session.scalars(stmt)
         return result.first()
 
     async def get(self, obj_id: PrimaryKey, load_relations: LoadRelations | None = None) -> T:
@@ -258,7 +259,7 @@ class AsyncBaseRepository[T: DeclarativeBase]:
             stmt = stmt.join(target_model)  # pragma: no cover
         if filter_expressions:
             stmt = stmt.where(*filter_expressions)
-        result = await self.session.execute(stmt)
+        result = await self._session.execute(stmt)
         return cast(Sequence[tuple[T, Any]], result.all())
 
     async def create(self, **fields: object) -> T:
@@ -280,8 +281,8 @@ class AsyncBaseRepository[T: DeclarativeBase]:
 
     async def add(self, obj: T) -> T:
         """Stage a new instance; caller commits in the orchestration layer."""
-        self.session.add(obj)
-        await self.session.flush()
+        self._session.add(obj)
+        await self._session.flush()
         return obj
 
     async def update_partial(
@@ -297,12 +298,12 @@ class AsyncBaseRepository[T: DeclarativeBase]:
             audit_updates = {k: v for k, v in fields.items() if k in writable}
             if not audit_updates:
                 return 0
-            row = await self.session.get(self.model, obj_id)
+            row = await self._session.get(self.model, obj_id)
             if row is None:
                 return 0
             for key, value in audit_updates.items():
                 setattr(row, key, value)
-            await self.session.flush()
+            await self._session.flush()
             return 1
         core_updates: RowMapping = {k: v for k, v in fields.items() if k in writable}
         if not core_updates:
@@ -314,7 +315,7 @@ class AsyncBaseRepository[T: DeclarativeBase]:
             )
         pk_col = self._pk_column
         stmt = update(self.model).where(pk_col == obj_id).values(**core_updates)
-        result = await self.session.execute(stmt)
+        result = await self._session.execute(stmt)
         return cursor_rowcount(result)
 
     async def update_where(
@@ -328,7 +329,7 @@ class AsyncBaseRepository[T: DeclarativeBase]:
         if not values:
             return 0
         stmt = update(self.model).where(*criteria).values(**values)
-        result = await self.session.execute(stmt, params or {})
+        result = await self._session.execute(stmt, params or {})
         return cursor_rowcount(result)
 
     async def delete_where(
@@ -351,7 +352,7 @@ class AsyncBaseRepository[T: DeclarativeBase]:
     async def remove(self, obj_id: PrimaryKey) -> bool:
         """Delete a record by primary key."""
         statement = delete(self.model).where(self._pk_column == obj_id)
-        result = await self.session.execute(statement)
+        result = await self._session.execute(statement)
         return cursor_rowcount(result) > 0
 
     async def delete_many(self, ids: IdList) -> int:
@@ -359,12 +360,12 @@ class AsyncBaseRepository[T: DeclarativeBase]:
         if not ids:
             return 0
         stmt = delete(self.model).where(self._pk_column.in_(ids))
-        result = await self.session.execute(stmt)
+        result = await self._session.execute(stmt)
         return cursor_rowcount(result)
 
     async def delete_all(self) -> int:
         """Delete every row for this model. Dev/ops only — prefer ``delete_where`` in app code."""
-        result = await self.session.execute(delete(self.model))
+        result = await self._session.execute(delete(self.model))
         return cursor_rowcount(result)
 
     async def batched_purge_ids(
@@ -389,17 +390,19 @@ class AsyncBaseRepository[T: DeclarativeBase]:
             if not ids:
                 break
             total += await self.delete_many(ids)
-            await self.session.commit()
+            await self._session.commit()
         return total
 
     def statement(self) -> AsyncStatementQueryBuilder[T]:
         """Return a fluent statement builder for reads on this model (default read path)."""
         if self._factory is not None:
             return self._factory.create_statement(self.model)
-        return AsyncSqlAlchemyStatementBuilder(self.session, self.model)
+        return AsyncSqlAlchemyStatementBuilder(self._session, self.model)
 
-    def for_repo[R](self, repo_class: type[R]) -> R:
+    def for_repo[R: AsyncBaseRepository[Any, Any]](
+        self, repo_class: type[R]
+    ) -> R:
         """Return a typed entity repository sharing this session and factory."""
         if self._factory is None:
             raise RuntimeError("for_repo() requires an AsyncRepositoryFactory")
-        return self._factory.get_repository(repo_class)
+        return cast(R, self._factory.get_repository(repo_class))

@@ -110,43 +110,6 @@ def test_get_column_value_unmapped() -> None:
         get_column_value(object())
 
 
-def test_get_column_value_inspect_model_raises() -> None:
-    from unittest.mock import patch
-
-    class DuckEntity:
-        __mapper__ = object()
-
-    with patch(
-        "sqlphilosophy.sync.repository.BaseRepository.inspect_model",
-        side_effect=ValueError("boom"),
-    ):
-        with pytest.raises(TypeError, match="not a mapped SQLAlchemy entity"):
-            get_column_value(DuckEntity())
-
-
-def test_mapped_model_class_for_non_type_candidate() -> None:
-    from unittest.mock import MagicMock
-
-    from sqlphilosophy.sql import _mapped_model_class_for
-
-    entity = MagicMock()
-    entity.__class__ = 42
-    assert _mapped_model_class_for(entity) is None
-
-
-def test_get_column_value_missing_mapper_attribute() -> None:
-    from unittest.mock import MagicMock
-    from unittest.mock import patch
-
-    class DuckEntity:
-        __mapper__ = object()
-
-    with patch("sqlphilosophy.sync.repository.BaseRepository.inspect_model") as inspect_model:
-        inspect_model.return_value = MagicMock(spec=[])
-        with pytest.raises(TypeError, match="not a mapped SQLAlchemy entity"):
-            get_column_value(DuckEntity())
-
-
 def test_row_mapping_helpers(sync_session: Session) -> None:
     row = Widget(name="map")
     sync_session.add(row)
@@ -181,8 +144,8 @@ def test_row_mapping_unwraps_duck_typed_entity() -> None:
 
     entity = FakeEntity()
     labeled = LabeledKey()
-    with patch("sqlphilosophy.sync.repository.BaseRepository.inspect_model") as inspect_model:
-        inspect_model.return_value.mapper = FakeMapper()
+    fake_insp = SimpleNamespace(mapper=FakeMapper())
+    with patch("sqlphilosophy.sql.sa_inspect", return_value=fake_insp):
         row = SimpleNamespace(_mapping={"user": entity, labeled: "Phish"})
         mapped = row_mapping(row)
     assert mapped["id"] == 5

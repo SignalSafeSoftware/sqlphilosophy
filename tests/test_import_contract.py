@@ -6,21 +6,25 @@ import pytest
 
 
 def test_canonical_imports() -> None:
+    from sqlphilosophy.aio.protocols import AsyncBaseRepositoryProtocol
     from sqlphilosophy.aio.protocols import AsyncRepositoryFactory
     from sqlphilosophy.aio.query import AsyncSqlAlchemyStatementBuilder
     from sqlphilosophy.aio.repository import AsyncBaseRepository
     from sqlphilosophy.audit.context import audit_context
     from sqlphilosophy.audit.model import TimestampModel
     from sqlphilosophy.sorting import ListQuery
+    from sqlphilosophy.sync.protocols import BaseRepositoryProtocol
     from sqlphilosophy.sync.protocols import RepositoryFactory
     from sqlphilosophy.sync.query import SqlAlchemyStatementBuilder
     from sqlphilosophy.sync.repository import BaseRepository
 
     _ = (
         BaseRepository,
+        BaseRepositoryProtocol,
         SqlAlchemyStatementBuilder,
         RepositoryFactory,
         AsyncBaseRepository,
+        AsyncBaseRepositoryProtocol,
         AsyncSqlAlchemyStatementBuilder,
         AsyncRepositoryFactory,
         ListQuery,

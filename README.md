@@ -72,6 +72,43 @@ with SessionLocal() as session:
 
 **Async:** swap `Session` → `AsyncSession`, `BaseRepository` → `AsyncBaseRepository` from `sqlphilosophy.aio.repository`, and `await` repository methods.
 
+## Strongly typed repositories (factory pattern)
+
+Domain repositories subclass `BaseRepository[Model, RepositoryFactory]` (or `AsyncBaseRepository` for async) and add typed query helpers. A session-scoped factory implements `RepositoryFactory` to cache repositories and wire `statement()` / `for_repo()` across repos on the same session.
+
+```python
+from sqlalchemy.orm import Session
+
+from sqlphilosophy.sync.protocols import RepositoryFactory
+from sqlphilosophy.sync.repository import BaseRepository
+
+
+class UserRepository(BaseRepository[User, RepositoryFactory]):
+    def __init__(self, session: Session, factory: RepositoryFactory) -> None:
+        super().__init__(User, session, factory)
+
+    def get_by_username(self, username: str) -> User | None:
+        return self.first(username=username)
+
+    def get_by_email(self, email: str) -> User | None:
+        return self.first(email=email)
+
+    def get_active_by_email(self, email: str) -> User | None:
+        return (
+            self.statement()
+            .where(User.email == email, User.is_active.is_(True))
+            .scalars()
+            .first()
+        )
+```
+
+Full runnable examples with models, a multi-repo factory, and cross-repository usage:
+
+- Sync: [`examples/typed_repository_sync.py`](./examples/typed_repository_sync.py)
+- Async: [`examples/typed_repository_async.py`](./examples/typed_repository_async.py)
+
+For async, swap `Session` → `AsyncSession`, `BaseRepository` → `AsyncBaseRepository` from `sqlphilosophy.aio.repository`, and `await` repository methods.
+
 ## Package layout
 
 | Module | Contents |

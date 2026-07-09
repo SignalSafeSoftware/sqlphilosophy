@@ -12,7 +12,7 @@ from sqlphilosophy.aio.query import AsyncSqlAlchemyStatementBuilder
 from sqlphilosophy.aio.repository import AsyncBaseRepository
 
 
-class _OtherAsyncRepo(AsyncBaseRepository[Widget]):
+class _OtherAsyncRepo(AsyncBaseRepository[Widget, AsyncRepositoryFactory]):
     def __init__(self, session: AsyncSession, factory: AsyncRepositoryFactory) -> None:
         super().__init__(Widget, session, factory)
 
