@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-07-09
+
+### Added
+
+- `BaseRepositoryProtocol` and `AsyncBaseRepositoryProtocol` — full CRUD surface for typed repository subclasses.
+- Runnable strongly typed repository examples: [`examples/typed_repository_sync.py`](./examples/typed_repository_sync.py) and [`examples/typed_repository_async.py`](./examples/typed_repository_async.py).
+- README section on the strongly typed repository + factory pattern.
+
+### Changed
+
+- `AsyncBaseRepository` now accepts a second type parameter (`U`) for the factory type, matching sync `BaseRepository[T, U]`.
+- Repository and protocol session/factory attributes are `_session` and `_factory` (replacing public `session` on implementations).
+- `RepositoryFactory` / `AsyncRepositoryFactory` `get_repository()` and `for_repo()` typing tightened with `cast` for domain repo constructors.
+- `.flake8` config (`max-line-length=120`) aligned with CI.
+
+### Fixed
+
+- `test_row_mapping_unwraps_duck_typed_entity` patches `sqlphilosophy.sql.sa_inspect` (the code path `row_mapping` actually uses).
+
+### CI
+
+- Bump GitHub Actions: `setup-uv` 8.3.0, `github-script` 9, Sonar scan action 8.2.0; bump dev dependency `greenlet` 3.5.3.
+
 ## [0.1.3] - 2026-06-28
 
 ### Changed
@@ -55,7 +78,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [RELEASING.md](./RELEASING.md) aligned with current **CI** publish job (not a separate `publish.yml`).
 
-[Unreleased]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.7...v0.1.8
 [0.1.3]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/SignalSafeSoftware/sqlphilosophy/releases/tag/v0.1.2
 [0.1.0]: https://github.com/SignalSafeSoftware/sqlphilosophy/releases/tag/v0.1.0
