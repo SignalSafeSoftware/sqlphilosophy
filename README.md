@@ -72,6 +72,84 @@ with SessionLocal() as session:
 
 **Async:** swap `Session` → `AsyncSession`, `BaseRepository` → `AsyncBaseRepository` from `sqlphilosophy.aio.repository`, and `await` repository methods.
 
+## Strongly typed repositories (factory pattern)
+
+Domain repositories subclass `BaseRepository[Model, RepositoryFactory]` and add typed query helpers. A session-scoped factory implements `RepositoryFactory` to cache repositories and wire `statement()` / `for_repo()` across repos on the same session.
+
+Full runnable examples:
+
+- Sync: [`examples/typed_repository_sync.py`](./examples/typed_repository_sync.py)
+- Async: [`examples/typed_repository_async.py`](./examples/typed_repository_async.py)
+
+```python
+from sqlalchemy import ForeignKey, String
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship
+
+from sqlphilosophy.sync.protocols import RepositoryFactory
+from sqlphilosophy.sync.repository import BaseRepository
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class Company(Base):
+    __tablename__ = "company"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(128))
+    slug: Mapped[str] = mapped_column(String(64), unique=True)
+    users: Mapped[list["User"]] = relationship(back_populates="company")
+
+
+class User(Base):
+    __tablename__ = "user"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(String(64), unique=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("company.id"))
+    company: Mapped[Company] = relationship(back_populates="users")
+
+
+class UserRepository(BaseRepository[User, RepositoryFactory]):
+    def __init__(self, session: Session, factory: RepositoryFactory) -> None:
+        super().__init__(User, session, factory)
+
+    def get_by_username(self, username: str) -> User | None:
+        return self.first(username=username)
+
+    def get_by_email(self, email: str) -> User | None:
+        return self.first(email=email)
+
+    def get_active_by_email(self, email: str) -> User | None:
+        return (
+            self.statement()
+            .where(User.email == email, User.is_active.is_(True))
+            .scalars()
+            .first()
+        )
+
+
+class CompanyRepository(BaseRepository[Company, RepositoryFactory]):
+    def __init__(self, session: Session, factory: RepositoryFactory) -> None:
+        super().__init__(Company, session, factory)
+
+    def get_by_slug(self, slug: str) -> Company | None:
+        return self.first(slug=slug)
+
+
+factory = SessionRepositoryFactory(session)  # implements RepositoryFactory
+users = factory.get_repository(UserRepository)
+companies = factory.get_repository(CompanyRepository)
+alice = users.get_by_username("alice")
+company = companies.get_by_slug("signal-safe")
+
+generic = factory.repository(User)
+other_company = generic.for_repo(CompanyRepository)  # same session + factory
+```
+
 ## Package layout
 
 | Module | Contents |

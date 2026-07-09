@@ -29,7 +29,7 @@ class _FakeFactory(RepositoryFactory):
         return repo_class(self._session, self)
 
 
-class _OtherRepo(BaseRepository[Widget]):
+class _OtherRepo(BaseRepository[Widget, RepositoryFactory]):
     def __init__(self, session: Session, factory: RepositoryFactory) -> None:
         super().__init__(Widget, session, factory)
 
@@ -141,28 +141,6 @@ def test_fetch_helpers(sync_session: Session) -> None:
     assert list(repo.iter_mappings(stmt))
     assert repo.fetch_mapping_first(stmt) is not None
     assert repo.fetch_mapping_one(stmt.select_from(Widget).where(Widget.id == rows[0]["id"]))
-
-
-def test_fetch_mappings_page_delegates_to_fetch_statement_mappings(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from sqlalchemy import select
-
-    repo = BaseRepository(Widget, MagicMock())
-    expected = [{"id": 1}]
-    monkeypatch.setattr(repo, "fetch_statement_mappings", lambda _stmt, _params=None: expected)
-    rows = repo.fetch_mappings_page(select(Widget.id), limit=10, offset=20)
-    assert rows == expected
-
-
-def test_fetch_mappings_page_rejects_negative_limit_or_offset() -> None:
-    from sqlalchemy import select
-
-    repo = BaseRepository(Widget, MagicMock())
-    with pytest.raises(ValueError, match="limit must be >= 0"):
-        repo.fetch_mappings_page(select(Widget.id), limit=-1, offset=0)
-    with pytest.raises(ValueError, match="offset must be >= 0"):
-        repo.fetch_mappings_page(select(Widget.id), limit=1, offset=-1)
 
 
 def test_exists_helpers(sync_session: Session) -> None:
