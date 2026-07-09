@@ -3,11 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
-from typing import Optional
-from typing import TYPE_CHECKING
-from typing import Protocol
-from typing import TypeVar
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 if TYPE_CHECKING:
     from sqlphilosophy.aio.repository import AsyncBaseRepository
@@ -16,32 +12,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
 from sqlphilosophy.aio.query import AsyncStatementQueryBuilder
-from sqlphilosophy.types import IdList
-from sqlphilosophy.types import PrimaryKey
-from sqlphilosophy.types import RowMapping
-from sqlphilosophy.types import RowValue
-from sqlphilosophy.types import SqlFilter
+from sqlphilosophy.types import IdList, PrimaryKey, RowMapping, RowValue, SqlFilter
 
 T = TypeVar("T", bound=DeclarativeBase)
 R = TypeVar("R", bound="AsyncBaseRepository[Any, Any]")
 
 
-class AsyncBaseRepositoryProtocol[T: DeclarativeBase, U: Optional[AsyncRepositoryFactory]](
+class AsyncBaseRepositoryProtocol[T: DeclarativeBase, U: AsyncRepositoryFactory | None](
     Protocol,
 ):
     """Generic read/write surface shared by sqlphilosophy ``AsyncBaseRepository[T]``."""
 
     model: type[T]
     _session: AsyncSession
-    _factory: Optional[U]
+    _factory: U | None
 
     async def get(self, obj_id: PrimaryKey, load_relations: Any = None) -> T: ...
 
     async def get_by_id(self, obj_id: PrimaryKey, load_relations: Any = None) -> T | None: ...
 
-    async def get_many(
-        self, ids: Sequence[PrimaryKey], load_relations: Any = None
-    ) -> Sequence[T]: ...
+    async def get_many(self, ids: Sequence[PrimaryKey], load_relations: Any = None) -> Sequence[T]: ...
 
     async def first(self, load_relations: Any = None, **filters: RowValue) -> T | None: ...
 
@@ -74,17 +64,13 @@ class AsyncBaseRepositoryProtocol[T: DeclarativeBase, U: Optional[AsyncRepositor
 
     async def add(self, obj: T) -> T: ...
 
-    async def get_or_create(
-        self, *, defaults: RowMapping | None = None, **lookup: RowValue
-    ) -> tuple[T, bool]: ...
+    async def get_or_create(self, *, defaults: RowMapping | None = None, **lookup: RowValue) -> tuple[T, bool]: ...
 
     async def remove(self, obj_id: PrimaryKey) -> bool: ...
 
     async def delete_many(self, ids: IdList) -> int: ...
 
-    async def delete_where(
-        self, *, criteria: Sequence[SqlFilter], params: RowMapping | None = None
-    ) -> int: ...
+    async def delete_where(self, *, criteria: Sequence[SqlFilter], params: RowMapping | None = None) -> int: ...
 
     async def update_partial(
         self,
@@ -115,8 +101,6 @@ class AsyncRepositoryFactory(Protocol):
         """Return a cached typed entity repository."""
         ...
 
-    def repository(
-        self, model: type[T]
-    ) -> AsyncBaseRepositoryProtocol[T, Optional[AsyncRepositoryFactory]]:
+    def repository(self, model: type[T]) -> AsyncBaseRepositoryProtocol[T, AsyncRepositoryFactory | None]:
         """Return generic CRUD helpers for ``model`` (``AsyncBaseRepository`` in Phobos)."""
         ...

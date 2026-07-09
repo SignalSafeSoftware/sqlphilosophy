@@ -1,50 +1,54 @@
-"""SQLAlchemy query helpers — ORM-first, Core for performance paths."""
+"""SQLAlchemy query helpers — ORM-first, Core for performance paths.
+
+For developer-defined raw SQL fragments (table/column names, ``ORDER BY`` text), prefer
+``sqlphilosophy.trusted_sql``. Helpers re-exported from this module remain for
+backward compatibility.
+"""
 
 from __future__ import annotations
-from collections.abc import Iterable
-from collections.abc import Sequence
-from datetime import date
-from datetime import datetime
-from typing import Any
-from typing import cast
-from typing import Mapping
-from typing import TypeVar
+
+from collections.abc import Iterable, Mapping, Sequence
+from datetime import date, datetime
+from typing import Any, cast
 from uuid import UUID
-from sqlalchemy import and_
-from sqlalchemy import bindparam
-from sqlalchemy import delete
-from sqlalchemy import desc
-from sqlalchemy import func
+
+from sqlalchemy import and_, bindparam, delete, func, select, update
 from sqlalchemy import inspect as sa_inspect
-from sqlalchemy import literal_column
-from sqlalchemy import select
-from sqlalchemy import update
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.orm import Session
-from sqlalchemy.sql import column
-from sqlalchemy.sql import table
+from sqlalchemy.orm import DeclarativeBase, Session
+from sqlalchemy.sql import Select
 from sqlalchemy.sql.elements import BindParameter
-from sqlphilosophy.audit.model import AuditMixin
-from sqlphilosophy.sorting import OrderByMap
-from sqlphilosophy.sorting import SortConfig
-from sqlphilosophy.types import ApiObject
-from sqlphilosophy.types import cursor_rowcount
-from sqlphilosophy.types import JSONObject
-from sqlphilosophy.types import JSONValue
-from sqlphilosophy.types import PrimaryKey
-from sqlphilosophy.types import RowMapping
-from sqlphilosophy.types import RowValue
-from sqlphilosophy.types import SqlFilter
-from sqlphilosophy.types import SqlFilters
-from sqlphilosophy.types import SqlOrderColumn
-from sqlphilosophy.types import SqlTable
 
-_ModelT = TypeVar("_ModelT", bound=DeclarativeBase)
+from sqlphilosophy import trusted_sql
+from sqlphilosophy._repository_shared import filter_writable_updates, plan_partial_update, require_mappings_page_limits
+from sqlphilosophy.sorting import OrderByMap, SortConfig
+from sqlphilosophy.trusted_sql import sql_table
+from sqlphilosophy.types import (
+    ApiObject,
+    JSONObject,
+    JSONValue,
+    PrimaryKey,
+    RowMapping,
+    RowValue,
+    SqlFilter,
+    SqlFilters,
+    SqlOrderColumn,
+    SqlTable,
+    cursor_rowcount,
+)
+
+# Backward-compatible re-exports; canonical import path is ``sqlphilosophy.trusted_sql``.
+col_eq = trusted_sql.col_eq
+col_icontains = trusted_sql.col_icontains
+col_range = trusted_sql.col_range
+literal_order_expr = trusted_sql.literal_order_expr
+order_by_allowlist = trusted_sql.order_by_allowlist
+order_expr_from_sort = trusted_sql.order_expr_from_sort
 
 
-def sql_table(table_name: str, *column_names: str) -> SqlTable:
-    """Lightweight Core table — prefer ORM models unless you need Core performance."""
-    return table(table_name, *[column(c) for c in column_names])
+def count_composed_select(stmt: Select[Any]) -> Select[Any]:
+    """Return ``COUNT(*)`` over ``stmt`` without sort, limit, or offset."""
+    unpaginated = stmt.order_by(None).limit(None).offset(None)
+    return select(func.count()).select_from(unpaginated.subquery())
 
 
 def get_column_value(entity: object) -> ApiObject:
@@ -213,7 +217,7 @@ def api_float(obj: Mapping[str, RowValue], key: str, default: float = 0.0) -> fl
 
 def row_json(row: RowMapping, key: str) -> JSONValue:
     val = row[key]
-    if isinstance(val, bool) or isinstance(val, (str, int, float, type(None))):
+    if isinstance(val, bool | str | int | float | type(None)):
         return cast(JSONValue, val)
     if isinstance(val, dict):
         if not all(isinstance(k, str) for k in val):
@@ -277,10 +281,7 @@ def apply_mappings_page(
     params: RowMapping | None = None,
 ) -> list[RowMapping]:
     """Execute ``stmt`` with limit/offset; return normalized row mappings."""
-    if limit < 0:
-        raise ValueError("limit must be >= 0")
-    if offset < 0:
-        raise ValueError("offset must be >= 0")
+    require_mappings_page_limits(limit=limit, offset=offset)
     paged = stmt.limit(limit).offset(offset)
     mapped = session.execute(paged, params or {}).mappings()
     rows = mapped.all() if hasattr(mapped, "all") else mapped
@@ -304,9 +305,9 @@ def expanding_in_param(
     return param, {name: [str(value) for value in values]}
 
 
-def partial_update_model(
+def partial_update_model[ModelT: DeclarativeBase](
     session: Session,
-    model: type[_ModelT],
+    model: type[ModelT],
     pk_value: PrimaryKey,
     fields: RowMapping,
     writable: frozenset[str],
@@ -316,32 +317,31 @@ def partial_update_model(
     extra_values: RowMapping | None = None,
 ) -> int:
     """Partial UPDATE on an ORM mapped class; ``fields`` keys must pass ``writable``."""
-    if issubclass(model, AuditMixin):
-        audit_updates = {k: v for k, v in fields.items() if k in writable}
-        if extra_values:
-            audit_updates = {**audit_updates, **extra_values}
-        if not audit_updates:
-            return 0
+    plan = plan_partial_update(
+        model,
+        fields,
+        writable,
+        touch_updated_on=touch_updated_on,
+        extra_values=extra_values,
+    )
+    if plan.action == "skip":
+        return 0
+    if plan.action == "audit":
         row = session.get(model, pk_value)
         if row is None:
             return 0
-        for key, value in audit_updates.items():
+        updates = plan.updates_for("audit")
+        for key, value in updates.items():
             setattr(row, key, value)
         session.flush()
         return 1
-    core_updates: RowMapping = {k: v for k, v in fields.items() if k in writable}
-    if extra_values:
-        core_updates = {**core_updates, **extra_values}
-    if not core_updates:
-        return 0
-    if touch_updated_on:
-        core_updates = cast(
-            RowMapping, {**dict(core_updates), "updated_on": cast(RowValue, func.now())}
-        )
-    pk_col = getattr(model, pk_attr)
-    stmt = update(model).where(pk_col == pk_value).values(**core_updates)
-    result = session.execute(stmt)
-    return cursor_rowcount(result)
+    if plan.action == "core":
+        updates = plan.updates_for("core")
+        pk_col = getattr(model, pk_attr)
+        stmt = update(model).where(pk_col == pk_value).values(**updates)
+        result = session.execute(stmt)
+        return cursor_rowcount(result)
+    raise RuntimeError(f"unexpected partial update plan action: {plan.action!r}")
 
 
 def partial_update(
@@ -356,7 +356,7 @@ def partial_update(
     extra_values: RowMapping | None = None,
 ) -> int:
     """Core partial UPDATE — use ``partial_update_model`` when an ORM class exists."""
-    updates: RowMapping = {k: v for k, v in fields.items() if k in writable}
+    updates = filter_writable_updates(fields, writable)
     if extra_values:
         updates = {**updates, **extra_values}
     if not updates:
@@ -402,9 +402,9 @@ def delete_by_ids(
     return cursor_rowcount(result)
 
 
-def delete_by_ids_model(
+def delete_by_ids_model[ModelT: DeclarativeBase](
     session: Session,
-    model: type[_ModelT],
+    model: type[ModelT],
     ids: list[object],
     *,
     pk_attr: str = "id",
@@ -415,38 +415,6 @@ def delete_by_ids_model(
     stmt = delete(model).where(pk_col.in_(ids))
     result = session.execute(stmt)
     return cursor_rowcount(result)
-
-
-def col_eq(col_sql: str, param_name: str, value: object) -> tuple[SqlFilter, ApiObject]:
-    return literal_column(col_sql) == bindparam(param_name), cast(
-        ApiObject, {param_name: cast(RowValue, value)}
-    )
-
-
-def col_icontains(
-    col_sql: str,
-    param_name: str,
-    raw: object,
-) -> tuple[SqlFilter, ApiObject] | None:
-    text_value = str(raw).strip()
-    if not text_value:
-        return None
-    crit = func.lower(literal_column(col_sql)).like(bindparam(param_name))
-    return crit, {param_name: f"%{text_value.lower()}%"}
-
-
-def col_range(
-    col_sql: str,
-    param_name: str,
-    operator: str,
-    value: object,
-) -> tuple[SqlFilter, ApiObject]:
-    col: SqlOrderColumn = literal_column(col_sql)
-    if operator == ">=":
-        return col >= bindparam(param_name), cast(ApiObject, {param_name: cast(RowValue, value)})
-    if operator == "<=":
-        return col <= bindparam(param_name), cast(ApiObject, {param_name: cast(RowValue, value)})
-    raise ValueError(f"unsupported operator: {operator}")
 
 
 def merge_criteria(
@@ -468,35 +436,6 @@ def combine_and(*criteria: SqlFilter | None) -> SqlFilter | None:
     if not present:
         return None
     return and_(*present)
-
-
-def order_by_allowlist(
-    order_key: str,
-    ordering_map: Mapping[str, str],
-    *,
-    allowlist: frozenset[str],
-) -> SqlOrderColumn:
-    if order_key not in allowlist:
-        raise ValueError(f"invalid order key: {order_key}")
-    return literal_order_expr(ordering_map[order_key])
-
-
-def literal_order_expr(spec: str) -> SqlOrderColumn:
-    """Build ORDER BY from a SQL fragment such as ``a.started_at DESC``."""
-    parts = spec.rsplit(" ", 1)
-    if len(parts) == 2 and parts[1].upper() == "DESC":
-        return desc(literal_column(parts[0]))
-    return literal_column(spec)
-
-
-def order_expr_from_sort(
-    column: str,
-    direction: str,
-    *,
-    columns: Mapping[str, Mapping[str, str]],
-) -> SqlOrderColumn:
-    """Build an ORDER BY expression from ``(column, asc|desc)`` and a column spec map."""
-    return literal_order_expr(columns[column][direction])
 
 
 def count_from_subquery(session: Session, subq: Any) -> int:

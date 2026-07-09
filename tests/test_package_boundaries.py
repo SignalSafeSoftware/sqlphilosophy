@@ -1,6 +1,7 @@
 """Guardrails: sqlphilosophy must stay free of app/framework imports."""
 
 from __future__ import annotations
+
 import ast
 from pathlib import Path
 
@@ -41,3 +42,15 @@ def test_sqlphilosophy_has_no_framework_or_app_imports() -> None:
     for path in sorted(_PKG.rglob("*.py")):
         violations = _violations_in_file(path)
         assert not violations, f"{path}: forbidden imports {violations}"
+
+
+def test_sync_and_aio_subpackages_do_not_reexport_public_types() -> None:
+    import sqlphilosophy.aio as aio_pkg
+    import sqlphilosophy.sync as sync_pkg
+
+    assert sync_pkg.__all__ == []
+    assert aio_pkg.__all__ == []
+    for attr in ("BaseRepository", "SqlAlchemyStatementBuilder"):
+        assert not hasattr(sync_pkg, attr)
+    for attr in ("AsyncBaseRepository", "AsyncSqlAlchemyStatementBuilder"):
+        assert not hasattr(aio_pkg, attr)

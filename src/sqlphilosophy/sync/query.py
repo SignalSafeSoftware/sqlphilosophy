@@ -5,25 +5,18 @@ Default read path: ``repo.statement()`` on ``BaseRepository`` via an injected
 """
 
 from __future__ import annotations
-from abc import ABC
-from abc import abstractmethod
+
+from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from typing import Any
-from typing import cast
-from sqlalchemy import func
-from sqlalchemy import select
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.orm import Session
+from typing import Any, cast
+
+from sqlalchemy import func, select
+from sqlalchemy.orm import DeclarativeBase, Session
 from sqlalchemy.sql import Select
-from sqlphilosophy.sorting import ListQuery
-from sqlphilosophy.sorting import OrderByMap
-from sqlphilosophy.sorting import SortConfig
-from sqlphilosophy.sql import row_mapping
-from sqlphilosophy.sql import row_mapping_opt
-from sqlphilosophy.sql import rows_mapping
-from sqlphilosophy.types import RowMapping
-from sqlphilosophy.types import SqlClause
-from sqlphilosophy.types import SqlFilter
+
+from sqlphilosophy.sorting import ListQuery, OrderByMap, SortConfig
+from sqlphilosophy.sql import count_composed_select, row_mapping, row_mapping_opt, rows_mapping
+from sqlphilosophy.types import RowMapping, SqlClause, SqlFilter
 
 
 class _MappingResult(ABC):
@@ -97,6 +90,12 @@ class StatementQueryBuilder[T: DeclarativeBase](ABC):
 
     @abstractmethod
     def distinct(self, *columns: SqlClause) -> StatementQueryBuilder[T]:
+        """Apply row-level ``SELECT DISTINCT`` or PostgreSQL ``DISTINCT ON``.
+
+        With no ``columns``, applies portable row-level ``SELECT DISTINCT``.
+        With one or more ``columns``, delegates to SQLAlchemy's PostgreSQL
+        ``DISTINCT ON`` semantics, which is not supported on all dialects.
+        """
         raise NotImplementedError
 
     @abstractmethod
@@ -162,6 +161,12 @@ class StatementQueryBuilder[T: DeclarativeBase](ABC):
 
     @abstractmethod
     def scalar(self) -> Any | None:
+        """Return the first column of the first row, or ``None`` when no row matches."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def scalar_one(self) -> Any:
+        """Return exactly one scalar value; raise when zero or multiple rows match."""
         raise NotImplementedError
 
     @abstractmethod
@@ -193,18 +198,12 @@ class _SqlAlchemyMappingResult(_MappingResult):
         self._params = params or {}
 
     def all(self) -> list[RowMapping]:
-        mapped = self._session.execute(
-            self._stmt, cast(Mapping[str, Any], self._params)
-        ).mappings()
+        mapped = self._session.execute(self._stmt, cast(Mapping[str, Any], self._params)).mappings()
         rows = mapped.all() if hasattr(mapped, "all") else mapped
         return rows_mapping(rows)
 
     def first(self) -> RowMapping | None:
-        row = (
-            self._session.execute(self._stmt.limit(1), cast(Mapping[str, Any], self._params))
-            .mappings()
-            .first()
-        )
+        row = self._session.execute(self._stmt.limit(1), cast(Mapping[str, Any], self._params)).mappings().first()
         return row_mapping_opt(row)
 
     def one(self) -> RowMapping:
@@ -231,6 +230,15 @@ class SqlAlchemyStatementBuilder[T: DeclarativeBase](StatementQueryBuilder[T]):
         self._entity_class = entity_class
         self._stmt: Select[Any] = select(entity_class)
         self._params: RowMapping = {}
+
+    def _copy(self) -> SqlAlchemyStatementBuilder[T]:
+        """Return a builder snapshot for terminal helpers that must not mutate ``self``."""
+        cloned = SqlAlchemyStatementBuilder.__new__(type(self))
+        cloned._session = self._session
+        cloned._entity_class = self._entity_class
+        cloned._stmt = self._stmt
+        cloned._params = dict(self._params)
+        return cloned
 
     def select_entity(self) -> SqlAlchemyStatementBuilder[T]:
         self._stmt = select(self._entity_class)
@@ -281,6 +289,12 @@ class SqlAlchemyStatementBuilder[T: DeclarativeBase](StatementQueryBuilder[T]):
         return self
 
     def distinct(self, *columns: SqlClause) -> SqlAlchemyStatementBuilder[T]:
+        """Apply row-level ``SELECT DISTINCT`` or PostgreSQL ``DISTINCT ON``.
+
+        With no ``columns``, applies portable row-level ``SELECT DISTINCT``.
+        With one or more ``columns``, delegates to SQLAlchemy's PostgreSQL
+        ``DISTINCT ON`` semantics, which is not supported on all dialects.
+        """
         self._stmt = self._stmt.distinct(*columns)
         return self
 
@@ -342,30 +356,25 @@ class SqlAlchemyStatementBuilder[T: DeclarativeBase](StatementQueryBuilder[T]):
         return self
 
     def count(self) -> int:
-        froms = self._stmt.get_final_froms()
-        if len(froms) > 1:
-            from_clause = froms[-1]  # pragma: no cover
-        elif froms:
-            from_clause = froms[0]
-        else:
-            from_clause = self._entity_class.__table__
-        count_stmt = select(func.count()).select_from(from_clause)
-        if self._stmt.whereclause is not None:
-            count_stmt = count_stmt.where(self._stmt.whereclause)
-        return int(
-            self._session.execute(count_stmt, cast(Mapping[str, Any], self._params)).scalar_one() or 0
-        )
+        count_stmt = count_composed_select(self._stmt)
+        return int(self._session.execute(count_stmt, cast(Mapping[str, Any], self._params)).scalar_one() or 0)
 
     def count_distinct(self, *columns: SqlClause) -> int:
         count_stmt = select(func.count(func.distinct(*columns)))
         count_stmt = count_stmt.select_from(*self._stmt.get_final_froms())
         if self._stmt.whereclause is not None:
             count_stmt = count_stmt.where(self._stmt.whereclause)
-        return int(
-            self._session.execute(count_stmt, cast(Mapping[str, Any], self._params)).scalar_one() or 0
-        )
+        return int(self._session.execute(count_stmt, cast(Mapping[str, Any], self._params)).scalar_one() or 0)
 
     def scalar(self) -> Any | None:
+        """Return the first column of the first row, or ``None`` when no row matches.
+
+        Raises ``MultipleResultsFound`` when more than one row is returned.
+        """
+        return self._session.execute(self._stmt, cast(Mapping[str, Any], self._params)).scalar_one_or_none()
+
+    def scalar_one(self) -> Any:
+        """Return exactly one scalar value; raise when zero or multiple rows match."""
         return self._session.execute(self._stmt, cast(Mapping[str, Any], self._params)).scalar_one()
 
     def mappings(self) -> _SqlAlchemyMappingResult:
@@ -381,9 +390,9 @@ class SqlAlchemyStatementBuilder[T: DeclarativeBase](StatementQueryBuilder[T]):
             raise ValueError("limit must be >= 0")
         if list_query.offset < 0:
             raise ValueError("offset must be >= 0")
-        builder = self
+        builder = self._copy()
         if sort is not None:
-            builder = builder.apply_sort(sort, list_query.order_by)
+            builder.apply_sort(sort, list_query.order_by)
         total = builder.count()
         rows = builder.limit(list_query.limit).offset(list_query.offset).mappings().all()
         return rows, total

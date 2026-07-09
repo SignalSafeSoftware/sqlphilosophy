@@ -1,12 +1,15 @@
 """Sync BaseRepository behavior."""
 
 from __future__ import annotations
-from unittest.mock import MagicMock
-import pytest
 
-from conftest import Widget
-from conftest import WidgetTag
-from sqlalchemy.orm import Session
+from unittest.mock import MagicMock
+
+import pytest
+from sqlalchemy import select
+from sqlalchemy.orm import Load, Session
+
+from conftest import Tag, Widget, WidgetTag
+from sqlphilosophy.sorting import ListQuery
 from sqlphilosophy.sync.protocols import RepositoryFactory
 from sqlphilosophy.sync.query import SqlAlchemyStatementBuilder
 from sqlphilosophy.sync.repository import BaseRepository
@@ -129,6 +132,16 @@ def test_batched_purge_ids(sync_session: Session) -> None:
     assert total == 2
 
 
+def test_batched_purge_ids_rejects_invalid_batch_size(sync_session: Session) -> None:
+    repo = BaseRepository(Widget, sync_session)
+    repo.create(name="b1")
+    with pytest.raises(ValueError, match="batch_size must be >= 1"):
+        repo.batched_purge_ids(criteria=[Widget.name.like("b%")], batch_size=0)
+    with pytest.raises(ValueError, match="batch_size must be >= 1"):
+        repo.batched_purge_ids(criteria=[Widget.name.like("b%")], batch_size=-1)
+    assert repo.count() == 1
+
+
 def test_fetch_helpers(sync_session: Session) -> None:
     repo = BaseRepository(Widget, sync_session)
     repo.create(name="mapped")
@@ -157,3 +170,97 @@ def test_schema_helpers(sync_session: Session) -> None:
     assert "widget" in names
     assert repo.has_table("widget")
     assert repo.has_table("missing") is False
+
+
+def test_update_where_empty_values_is_no_op(sync_session: Session) -> None:
+    repo = BaseRepository(Widget, sync_session)
+    row = repo.create(name="stay")
+    assert repo.update_where(criteria=[Widget.id == row.id], values={}) == 0
+    assert repo.get(row.id).name == "stay"
+
+
+def test_delete_where_accepts_bind_params(sync_session: Session) -> None:
+    repo = BaseRepository(Widget, sync_session)
+    row = repo.create(name="dw")
+    assert repo.delete_where(criteria=[Widget.id == row.id], params={"p": 1}) == 1
+    assert repo.get_by_id(row.id) is None
+
+
+def test_delete_where_empty_criteria_is_no_op(sync_session: Session) -> None:
+    repo = BaseRepository(Widget, sync_session)
+    repo.create(name="stay")
+    assert repo.delete_where(criteria=[]) == 0
+    assert repo.count() == 1
+
+
+def test_update_where_bulk_updates_matching_rows(sync_session: Session) -> None:
+    repo = BaseRepository(Widget, sync_session)
+    row = repo.create(name="join")
+    assert repo.update_where(criteria=[Widget.id == row.id], values={"name": "updated"}) == 1
+    assert repo.get(row.id).name == "updated"
+
+
+def test_get_many_with_load_relations(sync_session: Session) -> None:
+    repo = BaseRepository(Widget, sync_session)
+    row = repo.create(name="loaded")
+    loaded = repo.get_many([row.id], load_relations=[Load(Widget)])
+    assert len(loaded) == 1
+    assert loaded[0].name == "loaded"
+
+
+def test_get_with_join_returns_related_rows(sync_session: Session) -> None:
+    repo = BaseRepository(Widget, sync_session)
+    widget = repo.create(name="join")
+    BaseRepository(Tag, sync_session).create(label="lbl")
+    rows = repo.get_with_join(Tag, Widget.id == Tag.id, join_on=Widget.id == Tag.id)
+    assert isinstance(rows, list)
+    stmt = select(Widget).where(Widget.id == widget.id)
+    repo._apply_load_relations(stmt, [Load(Widget)])
+
+
+def test_fetch_sorted_mappings_without_sort(sync_session: Session) -> None:
+    repo = BaseRepository(Widget, sync_session)
+    repo.create(name="sorted")
+    rows = repo.fetch_sorted_mappings(
+        select(Widget.id),
+        list_query=ListQuery(offset=0, limit=5),
+        sort=None,
+    )
+    assert len(rows) >= 1
+
+
+def test_filter_pagination_returns_expected_page(sync_session: Session) -> None:
+    repo = BaseRepository(Widget, sync_session)
+    for i in range(3):
+        repo.create(name=f"p{i}")
+    assert len(repo.filter(page=2, limit=1)) == 1
+    assert len(repo.get_all(page=1, limit=2)) == 2
+
+
+def test_delete_all_removes_every_row(sync_session: Session) -> None:
+    repo = BaseRepository(Widget, sync_session)
+    repo.create(name="gone")
+    deleted = repo.delete_all()
+    assert deleted >= 1
+    assert repo.count() == 0
+
+
+def test_fetch_mappings_page_and_sorted_mappings(sync_session: Session) -> None:
+    repo = BaseRepository(Widget, sync_session)
+    repo.create(name="sorted")
+    from sqlalchemy import select as sa_select
+
+    from sqlphilosophy.sorting import SortConfig, SortSpec
+
+    sort = SortConfig(
+        default=SortSpec("name", "asc"),
+        columns={"name": {"asc": Widget.name, "desc": Widget.name.desc()}},
+    )
+    rows = repo.fetch_sorted_mappings(
+        sa_select(Widget.id, Widget.name),
+        list_query=ListQuery(offset=0, limit=5),
+        sort=sort,
+    )
+    assert rows
+    page = repo.fetch_mappings_page(sa_select(Widget.id), limit=5, offset=0)
+    assert page

@@ -28,6 +28,12 @@ The following must be **developer-defined** and must **never** be built from end
 
 **User-supplied values must use bind parameters** (SQLAlchemy parameters / bound values), not string concatenation into SQL text or identifiers.
 
+Import fragment helpers from **`sqlphilosophy.trusted_sql`** (canonical). The same names remain re-exported from `sqlphilosophy.sql` for backward compatibility:
+
+```python
+from sqlphilosophy.trusted_sql import col_eq, literal_order_expr, sql_table
+```
+
 ### Other responsibilities
 
 - Transaction boundaries and commit/rollback ownership remain with the application.

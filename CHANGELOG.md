@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `BaseRepositoryProtocol` and `AsyncBaseRepositoryProtocol` — full CRUD surface for typed repository subclasses.
-- Runnable strongly typed repository examples: [`examples/typed_repository_sync.py`](./examples/typed_repository_sync.py) and [`examples/typed_repository_async.py`](./examples/typed_repository_async.py).
+- Runnable strongly typed repository examples: [`docs/examples/typed_repository_sync.py`](./docs/examples/typed_repository_sync.py) and [`docs/examples/typed_repository_async.py`](./docs/examples/typed_repository_async.py).
 - README section on the strongly typed repository + factory pattern.
 
 ### Changed

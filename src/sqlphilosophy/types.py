@@ -1,21 +1,17 @@
 """Portable SQLAlchemy repository typing aliases (PyPI-safe, no app imports)."""
 
 from __future__ import annotations
+
 from collections.abc import Mapping
-from datetime import date
-from datetime import datetime
-from typing import Any
-from typing import cast
+from datetime import date, datetime
+from typing import Any, cast
 from uuid import UUID
+
 from sqlalchemy.engine import Result
 from sqlalchemy.engine.cursor import CursorResult
 from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.sql import ColumnElement
-from sqlalchemy.sql import Select
-from sqlalchemy.sql.selectable import FromClause
-from sqlalchemy.sql.selectable import LateralFromClause
-from sqlalchemy.sql.selectable import ScalarSelect
-from sqlalchemy.sql.selectable import TableClause
+from sqlalchemy.sql import ColumnElement, Select
+from sqlalchemy.sql.selectable import FromClause, LateralFromClause, ScalarSelect, TableClause
 
 __all__ = [
     "ApiObject",

@@ -42,9 +42,11 @@ jobs:
                   .venv/bin/python -m pip install --require-hashes --only-binary :all: --no-deps -r requirements-dev.txt
                   .venv/bin/python -m pip install --no-deps -e .
 
-            - name: Flake8
+            - name: Ruff
               if: matrix.python-version == '3.12'
-              run: .venv/bin/flake8 src tests --max-line-length=120 --extend-ignore=E203,W503
+              run: |
+                  .venv/bin/ruff check src tests docs/examples
+                  .venv/bin/ruff format --check src tests docs/examples
 
             - name: Mypy
               if: matrix.python-version == '3.12'
@@ -92,6 +94,8 @@ jobs:
     scan:
         name: Scan
         needs: [tests]
+        # Fork PRs never run scan (no secrets on untrusted code). Same-repo PRs run only
+        # with the "scan" label. Push (including v* tags) and workflow_dispatch always scan.
         if: |
             (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
             (
@@ -119,10 +123,22 @@ jobs:
             - name: Verify coverage report
               run: test -f coverage.xml
 
+            # Scan runs only on trusted refs (not fork PRs). When this job runs, the token
+            # must be present — fail fast with a clear message instead of a null-token scan.
+            - name: Verify SonarCloud token
+              env:
+                  PACKAGES_SONAR_TOKEN: ${{ secrets.PACKAGES_SONAR_TOKEN }}
+              run: |
+                  if [ -z "${PACKAGES_SONAR_TOKEN}" ]; then
+                      echo "::error::SonarCloud scan is required for this workflow run but PACKAGES_SONAR_TOKEN is not configured."
+                      echo "Configure the org shared SonarCloud token as a repository or organization secret named PACKAGES_SONAR_TOKEN."
+                      exit 1
+                  fi
+
             - name: SonarCloud scan
               uses: SonarSource/sonarqube-scan-action@713881670b6b3676cda39549040e2d88c70d582e # v8.2.0
               env:
-                  SONAR_TOKEN: ${{ secrets.PACKAGES_SONAR_TOKEN }}
+                  SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
 
             - name: Sonar PR comment
               if: github.event_name == 'pull_request'
@@ -159,12 +175,19 @@ jobs:
                   .venv/bin/python -m pip install --require-hashes --only-binary :all: --no-deps -r requirements-dev.txt
                   .venv/bin/python -m pip install --no-deps -e .
 
+            - name: Validate docs examples
+              run: |
+                  .venv/bin/python docs/examples/typed_repository_sync.py
+                  .venv/bin/python docs/examples/typed_repository_async.py
+
             - name: Smoke-test wheel artifact
               run: .venv/bin/python scripts/smoke_package.py
 
     publish:
         name: Publish
         needs: [checks, tests, scan, smoke-package]
+        # Publish runs only from main dispatch or v* tags. Sonar must succeed — scan is
+        # never skipped on those events, so a missing token or failed scan blocks release.
         if: |
             (
               (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
@@ -172,7 +195,8 @@ jobs:
             ) &&
             needs.checks.result == 'success' &&
             needs.tests.result == 'success' &&
-            (needs.scan.result == 'success' || needs.scan.result == 'skipped')
+            needs.scan.result == 'success' &&
+            needs.smoke-package.result == 'success'
         runs-on: ubuntu-latest
         permissions:
             contents: read

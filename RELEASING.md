@@ -5,25 +5,38 @@ Standalone repository: [SignalSafeSoftware/sqlphilosophy](https://github.com/Sig
 ## CI publish policy
 
 - **Checks and tests** run on every pull request.
-- **`scan` (Sonar)** on pull requests is **optional** — it runs only when the PR has the **`scan`** label. On **`push`** (including **`v*`** tag pushes) and **`workflow_dispatch`**, **`scan`** runs automatically.
-- **Publish does not run** from PR labels.
+- **`scan` (SonarCloud)** on pull requests is **optional** — it runs only when the PR has the **`scan`** label. On **`push`** (including **`v*`** tag pushes) and **`workflow_dispatch`**, **`scan`** runs automatically.
+- **Fork pull requests never run `scan`** — secrets are not exposed to untrusted code.
+- **Publish does not run** from pull requests.
 - **Publish runs** when:
   - **Manual:** GitHub Actions → **CI** → **Run workflow** on branch **`main`**, or
   - **Tag:** push a semver tag matching `v*` (for example `vX.Y.Z`).
-- **Publish requires** successful **`checks`**, **`tests`**, and **`scan`** jobs in the same workflow run (see [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)).
+- **Publish requires** successful **`checks`**, **`tests`**, **`scan`**, and **`smoke-package`** jobs in the same workflow run (see [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)). **`scan` must succeed** — a skipped or failed scan blocks release.
+- On publish events (`workflow_dispatch` on **`main`** or **`v*`** tag push), **`scan` always runs**; if **`PACKAGES_SONAR_TOKEN`** is missing, the workflow fails at a preflight step with an explicit error.
 - Pushing a **`v*`** tag starts a workflow run where **`checks`**, **`tests`**, and **`scan`** run before **Publish** can proceed.
 - **GitHub Releases do not trigger publish** in the current workflow.
 - **PyPI trusted publishing** uses GitHub Environment **`pypi`**. npm-style provenance and npm Environment approval do not apply.
+
+### SonarCloud secret
+
+This org uses a shared SonarCloud token secret named **`PACKAGES_SONAR_TOKEN`** (not `SONAR_TOKEN`). Configure it at the organization or repository level. The scan job maps it to the conventional `SONAR_TOKEN` environment variable expected by the SonarCloud action.
 
 ## Before you release
 
 1. Bump version in [`src/sqlphilosophy/VERSION`](./src/sqlphilosophy/VERSION) (single line, semver).
 2. Update [CHANGELOG.md](./CHANGELOG.md) (`[Unreleased]` → new version section when tagging).
-3. Run locally:
+3. Run locally (matches CI checks):
 
    ```bash
    uv sync --extra dev
-   uv run pytest
+   uv lock --check
+   uv run ruff check src tests docs/examples
+   uv run ruff format --check src tests docs/examples
+   uv run mypy src --install-types --non-interactive
+   uv run bandit -r src -q -x ./tests,./.venv
+   uv run pytest -q
+   uv run --extra dev python docs/examples/typed_repository_sync.py
+   uv run --extra dev python docs/examples/typed_repository_async.py
    uv run python -m build
    uv run twine check dist/*
    ```

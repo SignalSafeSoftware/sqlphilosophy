@@ -1,38 +1,46 @@
 """Generic async session-bound repository for ORM CRUD."""
 
 from __future__ import annotations
+
 from collections.abc import Sequence
-from typing import Any
-from typing import cast
-from typing import Optional
-from sqlalchemy import delete
-from sqlalchemy import func
+from typing import Any, cast
+
+from sqlalchemy import delete, func, select, update
 from sqlalchemy import inspect as sa_inspect
-from sqlalchemy import select
-from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm.interfaces import LoaderOption
+
+from sqlphilosophy._repository_shared import (
+    bulk_update_allowed,
+    criteria_delete_allowed,
+    extract_primary_keys,
+    lookup_not_found_message,
+    plan_partial_update,
+    require_batch_size,
+    require_mappings_page_limits,
+    require_page_and_limit,
+    require_single_column_primary_key,
+)
 from sqlphilosophy.aio.protocols import AsyncRepositoryFactory
-from sqlphilosophy.aio.query import AsyncSqlAlchemyStatementBuilder
-from sqlphilosophy.aio.query import AsyncStatementQueryBuilder
-from sqlphilosophy.audit.model import AuditMixin
-from sqlphilosophy.sorting import ListQuery
-from sqlphilosophy.sorting import SortConfig
+from sqlphilosophy.aio.query import AsyncSqlAlchemyStatementBuilder, AsyncStatementQueryBuilder
+from sqlphilosophy.sorting import ListQuery, SortConfig
 from sqlphilosophy.sql import rows_mapping
-from sqlphilosophy.types import IdList
-from sqlphilosophy.types import PrimaryKey
-from sqlphilosophy.types import RowMapping
-from sqlphilosophy.types import RowValue
-from sqlphilosophy.types import SqlBindParams
-from sqlphilosophy.types import SqlFilter
-from sqlphilosophy.types import SqlSelect
-from sqlphilosophy.types import cursor_rowcount
+from sqlphilosophy.types import (
+    IdList,
+    PrimaryKey,
+    RowMapping,
+    RowValue,
+    SqlBindParams,
+    SqlFilter,
+    SqlSelect,
+    cursor_rowcount,
+)
 
 LoadRelations = Sequence[LoaderOption]
 
 
-class AsyncBaseRepository[T: DeclarativeBase, U: Optional[AsyncRepositoryFactory]]:
+class AsyncBaseRepository[T: DeclarativeBase, U: AsyncRepositoryFactory | None]:
     """Async session-scoped CRUD helpers for a single mapped model."""
 
     def __init__(
@@ -44,10 +52,7 @@ class AsyncBaseRepository[T: DeclarativeBase, U: Optional[AsyncRepositoryFactory
         self.model = model
         self._session = session
         self._factory = factory
-        pk_cols = self.inspect_model(model).primary_key
-        if len(pk_cols) != 1:
-            raise TypeError(f"{model.__name__} must have a single-column primary key")
-        self._pk_column = pk_cols[0]
+        self._pk_column = require_single_column_primary_key(model, self.inspect_model(model))
 
     @classmethod
     def inspect_model(cls, model: type[DeclarativeBase]) -> Any:
@@ -85,9 +90,7 @@ class AsyncBaseRepository[T: DeclarativeBase, U: Optional[AsyncRepositoryFactory
             return result.unique()
         return result
 
-    async def fetch_statement_mappings(
-        self, stmt: Any, params: RowMapping | None = None
-    ) -> list[RowMapping]:
+    async def fetch_statement_mappings(self, stmt: Any, params: RowMapping | None = None) -> list[RowMapping]:
         """Execute ``stmt`` and return all rows as mappings."""
         result = await self._session.execute(stmt, params or {})
         mapped = result.mappings()
@@ -105,17 +108,13 @@ class AsyncBaseRepository[T: DeclarativeBase, U: Optional[AsyncRepositoryFactory
         for row in result.mappings():
             yield dict(row)
 
-    async def fetch_mapping_first(
-        self, stmt: SqlSelect, params: SqlBindParams | None = None
-    ) -> RowMapping | None:
+    async def fetch_mapping_first(self, stmt: SqlSelect, params: SqlBindParams | None = None) -> RowMapping | None:
         """Execute ``stmt`` and return the first row as a mapping, or ``None``."""
         result = await self._session.execute(stmt, params or {})
         row = result.mappings().first()
         return dict(row) if row is not None else None
 
-    async def fetch_mapping_one(
-        self, stmt: SqlSelect, params: SqlBindParams | None = None
-    ) -> RowMapping:
+    async def fetch_mapping_one(self, stmt: SqlSelect, params: SqlBindParams | None = None) -> RowMapping:
         """Execute ``stmt`` and return exactly one row as a mapping."""
         result = await self._session.execute(stmt, params or {})
         return dict(result.mappings().one())
@@ -129,10 +128,7 @@ class AsyncBaseRepository[T: DeclarativeBase, U: Optional[AsyncRepositoryFactory
         params: RowMapping | None = None,
     ) -> list[RowMapping]:
         """Execute ``stmt`` with limit/offset; return normalized row mappings."""
-        if limit < 0:
-            raise ValueError("limit must be >= 0")
-        if offset < 0:
-            raise ValueError("offset must be >= 0")
+        require_mappings_page_limits(limit=limit, offset=offset)
         paged = stmt.limit(limit).offset(offset)
         return await self.fetch_statement_mappings(paged, params)
 
@@ -154,9 +150,7 @@ class AsyncBaseRepository[T: DeclarativeBase, U: Optional[AsyncRepositoryFactory
             params=params,
         )
 
-    async def get_by_id(
-        self, obj_id: PrimaryKey, load_relations: LoadRelations | None = None
-    ) -> T | None:
+    async def get_by_id(self, obj_id: PrimaryKey, load_relations: LoadRelations | None = None) -> T | None:
         """Fetch a single record by primary key with optional eager loading."""
         stmt = select(self.model).where(self._pk_column == obj_id)
         stmt = self._apply_load_relations(stmt, load_relations)
@@ -179,9 +173,7 @@ class AsyncBaseRepository[T: DeclarativeBase, U: Optional[AsyncRepositoryFactory
         result = await self._session.scalar(stmt)
         return int(result or 0)
 
-    async def first(
-        self, load_relations: LoadRelations | None = None, **filters: RowValue
-    ) -> T | None:
+    async def first(self, load_relations: LoadRelations | None = None, **filters: RowValue) -> T | None:
         """Return the first row matching filters, with optional eager loading."""
         stmt = select(self.model).filter_by(**filters).limit(1)
         stmt = self._apply_load_relations(stmt, load_relations)
@@ -192,12 +184,10 @@ class AsyncBaseRepository[T: DeclarativeBase, U: Optional[AsyncRepositoryFactory
         """Fetch a single record by primary key; raise if missing."""
         obj = await self.get_by_id(obj_id, load_relations=load_relations)
         if obj is None:
-            raise LookupError(f"{self.model.__name__} matching id={obj_id!r} not found")
+            raise LookupError(lookup_not_found_message(self.model, obj_id))
         return obj
 
-    async def get_many(
-        self, ids: Sequence[PrimaryKey], load_relations: LoadRelations | None = None
-    ) -> Sequence[T]:
+    async def get_many(self, ids: Sequence[PrimaryKey], load_relations: LoadRelations | None = None) -> Sequence[T]:
         """Fetch multiple records by primary key."""
         if not ids:
             return []
@@ -215,10 +205,7 @@ class AsyncBaseRepository[T: DeclarativeBase, U: Optional[AsyncRepositoryFactory
         **filters: RowValue,
     ) -> Sequence[T]:
         """Return rows matching optional equality filters, optionally paginated."""
-        if page < 1:
-            raise ValueError("page must be >= 1")
-        if limit is not None and limit < 1:
-            raise ValueError("limit must be >= 1")
+        require_page_and_limit(page=page, limit=limit)
         stmt = select(self.model).filter_by(**filters).order_by(self._pk_column)
         if limit is not None:
             stmt = stmt.limit(limit).offset((page - 1) * limit)
@@ -234,10 +221,7 @@ class AsyncBaseRepository[T: DeclarativeBase, U: Optional[AsyncRepositoryFactory
         load_relations: LoadRelations | None = None,
     ) -> Sequence[T]:
         """Fetch records for this model type, optionally paginated by ``page`` and ``limit``."""
-        if page < 1:
-            raise ValueError("page must be >= 1")
-        if limit is not None and limit < 1:
-            raise ValueError("limit must be >= 1")
+        require_page_and_limit(page=page, limit=limit)
         statement = select(self.model).order_by(self._pk_column)
         if limit is not None:
             statement = statement.limit(limit).offset((page - 1) * limit)
@@ -253,7 +237,7 @@ class AsyncBaseRepository[T: DeclarativeBase, U: Optional[AsyncRepositoryFactory
     ) -> Sequence[tuple[T, Any]]:
         """Explicit INNER JOIN returning ``(base_row, target_row)`` tuples."""
         stmt = select(self.model, target_model)
-        if join_on is not None:
+        if join_on is not None:  # noqa: SIM108
             stmt = stmt.join(target_model, join_on)
         else:
             stmt = stmt.join(target_model)  # pragma: no cover
@@ -294,29 +278,29 @@ class AsyncBaseRepository[T: DeclarativeBase, U: Optional[AsyncRepositoryFactory
         touch_updated_on: bool = False,
     ) -> int:
         """Apply a partial update; returns affected row count (0 if none)."""
-        if issubclass(self.model, AuditMixin):
-            audit_updates = {k: v for k, v in fields.items() if k in writable}
-            if not audit_updates:
-                return 0
+        plan = plan_partial_update(
+            self.model,
+            fields,
+            writable,
+            touch_updated_on=touch_updated_on,
+        )
+        if plan.action == "skip":
+            return 0
+        if plan.action == "audit":
             row = await self._session.get(self.model, obj_id)
             if row is None:
                 return 0
-            for key, value in audit_updates.items():
+            updates = plan.updates_for("audit")
+            for key, value in updates.items():
                 setattr(row, key, value)
             await self._session.flush()
             return 1
-        core_updates: RowMapping = {k: v for k, v in fields.items() if k in writable}
-        if not core_updates:
-            return 0
-        if touch_updated_on:
-            core_updates = cast(
-                RowMapping,
-                {**dict(core_updates), "updated_on": cast(RowValue, func.now())},
-            )
-        pk_col = self._pk_column
-        stmt = update(self.model).where(pk_col == obj_id).values(**core_updates)
-        result = await self._session.execute(stmt)
-        return cursor_rowcount(result)
+        if plan.action == "core":
+            updates = plan.updates_for("core")
+            stmt = update(self.model).where(self._pk_column == obj_id).values(**updates)
+            result = await self._session.execute(stmt)
+            return cursor_rowcount(result)
+        raise RuntimeError(f"unexpected partial update plan action: {plan.action!r}")
 
     async def update_where(
         self,
@@ -326,7 +310,7 @@ class AsyncBaseRepository[T: DeclarativeBase, U: Optional[AsyncRepositoryFactory
         params: SqlBindParams | None = None,
     ) -> int:
         """Bulk UPDATE rows matching ``criteria``; returns affected row count."""
-        if not values:
+        if not bulk_update_allowed(values):
             return 0
         stmt = update(self.model).where(*criteria).values(**values)
         result = await self._session.execute(stmt, params or {})
@@ -339,14 +323,14 @@ class AsyncBaseRepository[T: DeclarativeBase, U: Optional[AsyncRepositoryFactory
         params: SqlBindParams | None = None,
     ) -> int:
         """Delete rows matching ``criteria`` via PK lookup + ``delete_many``."""
-        if not criteria:
+        if not criteria_delete_allowed(criteria):
             return 0
         pk_key = self._pk_column.key
         builder = self.statement().select_columns(self._pk_column).where(*criteria)
         if params:
             builder = builder.with_params(params)
         rows = await builder.mappings().all()
-        ids = [cast(PrimaryKey, row[pk_key]) for row in rows]
+        ids = extract_primary_keys(rows, pk_key)
         return await self.delete_many(ids)
 
     async def remove(self, obj_id: PrimaryKey) -> bool:
@@ -375,18 +359,14 @@ class AsyncBaseRepository[T: DeclarativeBase, U: Optional[AsyncRepositoryFactory
         batch_size: int,
     ) -> int:
         """Delete rows matching ``criteria`` in ``batch_size`` chunks, committing each batch."""
+        require_batch_size(batch_size)
         pk_key = self._pk_column.key
         total = 0
         while True:
             rows = await (
-                self.statement()
-                .select_columns(self._pk_column)
-                .where(*criteria)
-                .limit(batch_size)
-                .mappings()
-                .all()
+                self.statement().select_columns(self._pk_column).where(*criteria).limit(batch_size).mappings().all()
             )
-            ids = [cast(PrimaryKey, row[pk_key]) for row in rows]
+            ids = extract_primary_keys(rows, pk_key)
             if not ids:
                 break
             total += await self.delete_many(ids)
@@ -399,9 +379,7 @@ class AsyncBaseRepository[T: DeclarativeBase, U: Optional[AsyncRepositoryFactory
             return self._factory.create_statement(self.model)
         return AsyncSqlAlchemyStatementBuilder(self._session, self.model)
 
-    def for_repo[R: AsyncBaseRepository[Any, Any]](
-        self, repo_class: type[R]
-    ) -> R:
+    def for_repo[R: AsyncBaseRepository[Any, Any]](self, repo_class: type[R]) -> R:
         """Return a typed entity repository sharing this session and factory."""
         if self._factory is None:
             raise RuntimeError("for_repo() requires an AsyncRepositoryFactory")

@@ -1,6 +1,7 @@
 """Logical audit column names for listener stamping."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 

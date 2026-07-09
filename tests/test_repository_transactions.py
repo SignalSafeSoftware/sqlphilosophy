@@ -1,33 +1,17 @@
-"""Batch 7A behavioral tests: transaction ownership, destructive helpers, async parity."""
+"""Repository transaction ownership and destructive helper behavior."""
 
 from __future__ import annotations
 
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from conftest import Base
-from conftest import Widget
+from conftest import Base, Widget
 from sqlphilosophy.aio.query import AsyncSqlAlchemyStatementBuilder
-from sqlphilosophy.sorting import ListQuery
-from sqlphilosophy.sorting import SortConfig
-from sqlphilosophy.sorting import SortSpec
+from sqlphilosophy.sorting import ListQuery, SortConfig, SortSpec
 from sqlphilosophy.sync.query import SqlAlchemyStatementBuilder
 from sqlphilosophy.sync.repository import BaseRepository
-
-
-def test_sync_and_aio_subpackages_have_no_reexports() -> None:
-    import sqlphilosophy.aio as aio_pkg
-    import sqlphilosophy.sync as sync_pkg
-
-    assert sync_pkg.__all__ == []
-    assert aio_pkg.__all__ == []
-    for attr in ("BaseRepository", "SqlAlchemyStatementBuilder"):
-        assert not hasattr(sync_pkg, attr)
-    for attr in ("AsyncBaseRepository", "AsyncSqlAlchemyStatementBuilder"):
-        assert not hasattr(aio_pkg, attr)
 
 
 def test_create_flushes_without_commit_until_caller_commits() -> None:

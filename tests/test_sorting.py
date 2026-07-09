@@ -1,15 +1,13 @@
 """Sorting and pagination types."""
 
 from __future__ import annotations
+
 import pytest
+from sqlalchemy import desc
 
 from conftest import Widget
-from sqlalchemy import desc
-from sqlphilosophy.sorting import ListQuery
-from sqlphilosophy.sorting import SortConfig
-from sqlphilosophy.sorting import SortSpec
-from sqlphilosophy.sql import get_sort_column
-from sqlphilosophy.sql import literal_order_expr
+from sqlphilosophy.sorting import ListQuery, SortConfig, SortSpec
+from sqlphilosophy.sql import get_sort_column, literal_order_expr
 
 
 def test_list_query_from_page_valid() -> None:
@@ -34,6 +32,61 @@ def test_sort_config_allowlist_and_default() -> None:
     )
     assert sort.resolve_spec({"name": "asc"}) == SortSpec("id", "asc")
     assert sort.resolve_spec({"id": "desc"}) == SortSpec("id", "desc")
+
+
+def test_sort_config_valid_sort_resolves_correctly() -> None:
+    sort = SortConfig(
+        default=SortSpec("id", "asc"),
+        columns={
+            "id": {"asc": Widget.id, "desc": Widget.id.desc()},
+            "name": {"asc": Widget.name, "desc": Widget.name.desc()},
+        },
+    )
+    assert sort.resolve_spec({"name": "desc"}) == SortSpec("name", "desc")
+
+
+def test_sort_config_missing_sort_uses_default() -> None:
+    default = SortSpec("id", "asc")
+    sort = SortConfig(
+        default=default,
+        columns={"id": {"asc": Widget.id, "desc": Widget.id.desc()}},
+    )
+    assert sort.resolve_spec(None) == default
+    assert sort.resolve_spec({}) == default
+
+
+def test_sort_config_invalid_sort_falls_back_with_default_policy() -> None:
+    default = SortSpec("id", "asc")
+    sort = SortConfig(
+        default=default,
+        columns={"id": {"asc": Widget.id, "desc": Widget.id.desc()}},
+        allowlist=frozenset({"id"}),
+        invalid="default",
+    )
+    assert sort.resolve_spec({"unknown": "asc"}) == default
+    assert sort.resolve_spec({"id": "sideways"}) == default
+
+
+def test_sort_config_invalid_sort_raises_with_strict_policy() -> None:
+    sort = SortConfig(
+        default=SortSpec("id", "asc"),
+        columns={"id": {"asc": Widget.id, "desc": Widget.id.desc()}},
+        allowlist=frozenset({"id"}),
+        invalid="raise",
+    )
+    with pytest.raises(ValueError, match="invalid sort column: 'unknown'"):
+        sort.resolve_spec({"unknown": "asc"})
+    with pytest.raises(ValueError, match="invalid sort direction: 'sideways'"):
+        sort.resolve_spec({"id": "sideways"})
+
+
+def test_sort_config_rejects_unknown_invalid_policy() -> None:
+    with pytest.raises(ValueError, match='invalid must be "default" or "raise"'):
+        SortConfig(
+            default=SortSpec("id", "asc"),
+            columns={"id": {"asc": Widget.id}},
+            invalid="ignore",  # type: ignore[arg-type]
+        )
 
 
 def test_sort_config_literal_sql_and_resolver() -> None:

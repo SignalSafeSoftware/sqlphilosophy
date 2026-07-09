@@ -1,25 +1,17 @@
 """Shared fixtures for sqlphilosophy tests."""
 
 from __future__ import annotations
+
 from collections.abc import AsyncGenerator
 from datetime import datetime
-import pytest
 
-from sqlalchemy import create_engine
-from sqlalchemy import ForeignKey
-from sqlalchemy import String
-from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import mapped_column
-from sqlalchemy.orm import relationship
-from sqlalchemy.orm import Session
-from sqlalchemy.orm import sessionmaker
+import pytest
+from sqlalchemy import ForeignKey, String, create_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
+
 from sqlphilosophy.audit.listener import configure_audit_listeners
-from sqlphilosophy.audit.model import SoftDeleteTimestampModel
-from sqlphilosophy.audit.model import TimestampModel
+from sqlphilosophy.audit.model import SoftDeleteTimestampModel, TimestampModel
 
 
 class Base(DeclarativeBase):
@@ -59,7 +51,7 @@ class Parent(Base):
     __tablename__ = "parent"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    children: Mapped[list["Child"]] = relationship(back_populates="parent")
+    children: Mapped[list[Child]] = relationship(back_populates="parent")
 
 
 class Child(Base):

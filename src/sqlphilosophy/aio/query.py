@@ -1,25 +1,19 @@
 """Async StatementQueryBuilder for typed entity-repo reads."""
 
 from __future__ import annotations
-from abc import ABC
-from abc import abstractmethod
+
+from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from typing import Any
-from typing import cast
-from sqlalchemy import func
-from sqlalchemy import select
+from typing import Any, cast
+
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.sql import Select
-from sqlphilosophy.sorting import ListQuery
-from sqlphilosophy.sorting import OrderByMap
-from sqlphilosophy.sorting import SortConfig
-from sqlphilosophy.sql import row_mapping
-from sqlphilosophy.sql import row_mapping_opt
-from sqlphilosophy.sql import rows_mapping
-from sqlphilosophy.types import RowMapping
-from sqlphilosophy.types import SqlClause
-from sqlphilosophy.types import SqlFilter
+
+from sqlphilosophy.sorting import ListQuery, OrderByMap, SortConfig
+from sqlphilosophy.sql import count_composed_select, row_mapping, row_mapping_opt, rows_mapping
+from sqlphilosophy.types import RowMapping, SqlClause, SqlFilter
 
 
 class _AsyncMappingResult(ABC):
@@ -93,6 +87,12 @@ class AsyncStatementQueryBuilder[T: DeclarativeBase](ABC):
 
     @abstractmethod
     def distinct(self, *columns: SqlClause) -> AsyncStatementQueryBuilder[T]:
+        """Apply row-level ``SELECT DISTINCT`` or PostgreSQL ``DISTINCT ON``.
+
+        With no ``columns``, applies portable row-level ``SELECT DISTINCT``.
+        With one or more ``columns``, delegates to SQLAlchemy's PostgreSQL
+        ``DISTINCT ON`` semantics, which is not supported on all dialects.
+        """
         raise NotImplementedError
 
     @abstractmethod
@@ -158,6 +158,12 @@ class AsyncStatementQueryBuilder[T: DeclarativeBase](ABC):
 
     @abstractmethod
     async def scalar(self) -> Any | None:
+        """Return the first column of the first row, or ``None`` when no row matches."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def scalar_one(self) -> Any:
+        """Return exactly one scalar value; raise when zero or multiple rows match."""
         raise NotImplementedError
 
     @abstractmethod
@@ -200,9 +206,7 @@ class _AsyncSqlAlchemyMappingResult(_AsyncMappingResult):
         return rows_mapping(rows)
 
     async def first(self) -> RowMapping | None:
-        result = await self._session.execute(
-            self._stmt.limit(1), cast(Mapping[str, Any], self._params)
-        )
+        result = await self._session.execute(self._stmt.limit(1), cast(Mapping[str, Any], self._params))
         row = result.mappings().first()
         return row_mapping_opt(row)
 
@@ -238,6 +242,15 @@ class AsyncSqlAlchemyStatementBuilder[T: DeclarativeBase](AsyncStatementQueryBui
         self._entity_class = entity_class
         self._stmt: Select[Any] = select(entity_class)
         self._params: RowMapping = {}
+
+    def _copy(self) -> AsyncSqlAlchemyStatementBuilder[T]:
+        """Return a builder snapshot for terminal helpers that must not mutate ``self``."""
+        cloned = AsyncSqlAlchemyStatementBuilder.__new__(type(self))
+        cloned._session = self._session
+        cloned._entity_class = self._entity_class
+        cloned._stmt = self._stmt
+        cloned._params = dict(self._params)
+        return cloned
 
     def select_entity(self) -> AsyncSqlAlchemyStatementBuilder[T]:
         self._stmt = select(self._entity_class)
@@ -288,6 +301,12 @@ class AsyncSqlAlchemyStatementBuilder[T: DeclarativeBase](AsyncStatementQueryBui
         return self
 
     def distinct(self, *columns: SqlClause) -> AsyncSqlAlchemyStatementBuilder[T]:
+        """Apply row-level ``SELECT DISTINCT`` or PostgreSQL ``DISTINCT ON``.
+
+        With no ``columns``, applies portable row-level ``SELECT DISTINCT``.
+        With one or more ``columns``, delegates to SQLAlchemy's PostgreSQL
+        ``DISTINCT ON`` semantics, which is not supported on all dialects.
+        """
         self._stmt = self._stmt.distinct(*columns)
         return self
 
@@ -349,16 +368,7 @@ class AsyncSqlAlchemyStatementBuilder[T: DeclarativeBase](AsyncStatementQueryBui
         return self
 
     async def count(self) -> int:
-        froms = self._stmt.get_final_froms()
-        if len(froms) > 1:
-            from_clause = froms[-1]  # pragma: no cover
-        elif froms:
-            from_clause = froms[0]
-        else:
-            from_clause = self._entity_class.__table__
-        count_stmt = select(func.count()).select_from(from_clause)
-        if self._stmt.whereclause is not None:
-            count_stmt = count_stmt.where(self._stmt.whereclause)
+        count_stmt = count_composed_select(self._stmt)
         result = await self._session.execute(count_stmt, cast(Mapping[str, Any], self._params))
         return int(result.scalar_one() or 0)
 
@@ -371,6 +381,15 @@ class AsyncSqlAlchemyStatementBuilder[T: DeclarativeBase](AsyncStatementQueryBui
         return int(result.scalar_one() or 0)
 
     async def scalar(self) -> Any | None:
+        """Return the first column of the first row, or ``None`` when no row matches.
+
+        Raises ``MultipleResultsFound`` when more than one row is returned.
+        """
+        result = await self._session.execute(self._stmt, cast(Mapping[str, Any], self._params))
+        return result.scalar_one_or_none()
+
+    async def scalar_one(self) -> Any:
+        """Return exactly one scalar value; raise when zero or multiple rows match."""
         result = await self._session.execute(self._stmt, cast(Mapping[str, Any], self._params))
         return result.scalar_one()
 
@@ -387,9 +406,9 @@ class AsyncSqlAlchemyStatementBuilder[T: DeclarativeBase](AsyncStatementQueryBui
             raise ValueError("limit must be >= 0")
         if list_query.offset < 0:
             raise ValueError("offset must be >= 0")
-        builder = self
+        builder = self._copy()
         if sort is not None:
-            builder = builder.apply_sort(sort, list_query.order_by)
+            builder.apply_sort(sort, list_query.order_by)
         total = await builder.count()
         rows = await builder.limit(list_query.limit).offset(list_query.offset).mappings().all()
         return rows, total

@@ -1,12 +1,13 @@
 """List pagination and sort resolution for repository queries."""
 
 from __future__ import annotations
-from collections.abc import Callable
-from collections.abc import Mapping
+
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Literal
 
 SortDirection = Literal["asc", "desc"]
+InvalidSortPolicy = Literal["default", "raise"]
 OrderByMap = dict[str, SortDirection]
 
 
@@ -50,6 +51,11 @@ class SortConfig:
     * ``columns`` — map of API column name → ``{asc, desc}`` SQL/ORM expressions, or
     * ``columns`` + ``literal_sql=True`` — map of string SQL fragments, or
     * ``resolver`` — custom ``SortSpec → order clause(s)`` function.
+
+    ``invalid`` controls client ``order_by`` that fails the allowlist or direction check:
+
+    * ``"default"`` (default) — fall back to ``default`` sort spec.
+    * ``"raise"`` — raise ``ValueError`` so API bugs surface during development.
     """
 
     def __init__(
@@ -60,20 +66,30 @@ class SortConfig:
         allowlist: frozenset[str] | None = None,
         literal_sql: bool = False,
         resolver: SortResolver | None = None,
+        invalid: InvalidSortPolicy = "default",
     ) -> None:
         if resolver is None and columns is None:
             raise ValueError("SortConfig requires columns or resolver")
+        if invalid not in ("default", "raise"):
+            raise ValueError('invalid must be "default" or "raise"')
         self._default = default
         self._columns = columns or {}
         self._literal_sql = literal_sql
         self._resolver = resolver
         self._allowlist = allowlist if allowlist is not None else frozenset(self._columns)
+        self._invalid = invalid
 
     def resolve_spec(self, order_by: OrderByMap | None) -> SortSpec:
         if order_by:
             column, direction = next(iter(order_by.items()))
-            if direction in ("asc", "desc") and column in self._allowlist:
+            valid_direction = direction in ("asc", "desc")
+            valid_column = column in self._allowlist
+            if valid_direction and valid_column:
                 return SortSpec(column, direction)
+            if self._invalid == "raise":
+                if not valid_column:
+                    raise ValueError(f"invalid sort column: {column!r}")
+                raise ValueError(f"invalid sort direction: {direction!r}")
         return self._default
 
     def order_expression(self, order_by: OrderByMap | None) -> object:
@@ -82,7 +98,7 @@ class SortConfig:
         if self._resolver is not None:
             return self._resolver(spec)
         if self._literal_sql:
-            from sqlphilosophy.sql import literal_order_expr
+            from sqlphilosophy.trusted_sql import literal_order_expr
 
             raw = self._columns[spec.column][spec.direction]
             if not isinstance(raw, str):

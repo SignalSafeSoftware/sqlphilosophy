@@ -1,22 +1,22 @@
 """Audit context, listeners, and models."""
 
 from __future__ import annotations
-from datetime import datetime
-import pytest
 
-from conftest import SoftWidget
-from conftest import Widget
+from datetime import UTC, datetime
+
+import pytest
 from sqlalchemy.orm import Session
-from sqlphilosophy.audit.context import audit_context
-from sqlphilosophy.audit.context import AuditContext
-from sqlphilosophy.audit.context import get_audit_actor_id
-from sqlphilosophy.audit.context import get_audit_context
-from sqlphilosophy.audit.context import set_audit_context
-from sqlphilosophy.audit.fields import AuditColumns
-from sqlphilosophy.audit.fields import is_audit_model
-from sqlphilosophy.audit.listener import configure_audit_listeners
-from sqlphilosophy.audit.listener import get_audit_listener
-from sqlphilosophy.audit.listener import soft_delete
+
+from conftest import SoftWidget, Widget
+from sqlphilosophy.audit.context import (
+    AuditContext,
+    audit_context,
+    get_audit_actor_id,
+    get_audit_context,
+    set_audit_context,
+)
+from sqlphilosophy.audit.fields import AuditColumns, is_audit_model
+from sqlphilosophy.audit.listener import configure_audit_listeners, get_audit_listener, soft_delete
 
 
 def test_audit_context_nested_and_reset() -> None:
@@ -30,9 +30,8 @@ def test_audit_context_nested_and_reset() -> None:
 
 
 def test_audit_context_resets_on_exception() -> None:
-    with pytest.raises(RuntimeError):
-        with audit_context(5):
-            raise RuntimeError("boom")
+    with pytest.raises(RuntimeError), audit_context(5):
+        raise RuntimeError("boom")
     assert get_audit_actor_id() is None
 
 
@@ -97,3 +96,34 @@ def test_listener_set_helpers() -> None:
     listener._set(target, "updated_by_id", 1)
     listener._set_if_empty(target, "missing_attr", 1)
     listener._set(object(), "anything", 1)
+
+
+def test_listener_does_not_overwrite_nonempty_created_on() -> None:
+
+    listener = get_audit_listener()
+    row = Widget(name="filled")
+    stamped = datetime.now(UTC)
+    row.created_on = stamped
+    listener._set_if_empty(row, "created_on", datetime.now(UTC))
+    assert row.created_on == stamped
+    listener.stamp_on_update(row)
+
+
+def test_listener_stamps_update_without_actor(sync_session: Session) -> None:
+    listener = get_audit_listener()
+    row = Widget(name="no-actor")
+    sync_session.add(row)
+    sync_session.flush()
+    before = row.updated_on
+    listener.stamp_on_update(row)
+    assert row.updated_on >= before
+
+
+def test_listener_soft_delete_without_actor(sync_session: Session) -> None:
+    listener = get_audit_listener()
+    row = SoftWidget(name="soft-no-actor")
+    sync_session.add(row)
+    sync_session.flush()
+    listener.stamp_on_soft_delete(row, actor=None)
+    assert row.deleted_on is not None
+    assert row.deleted_by_id is None

@@ -1,24 +1,24 @@
 """SQLAlchemy audit listeners gated on :class:`AuditMixin`."""
 
 from __future__ import annotations
+
 from abc import ABC
-from datetime import datetime
-from datetime import timezone
-from typing import Any
-from typing import cast
+from datetime import UTC, datetime
+from typing import Any, cast
+
 from sqlalchemy import event
 from sqlalchemy.orm import Mapper
+
 from sqlphilosophy.audit.context import get_audit_context
-from sqlphilosophy.audit.fields import AuditColumns
-from sqlphilosophy.audit.fields import is_audit_model
+from sqlphilosophy.audit.fields import AuditColumns, is_audit_model
 from sqlphilosophy.audit.model import AuditMixin
 
 _ATTACHED = False
 
 
-class AuditListener(ABC):
+class AuditListener(ABC):  # noqa: B024
     def now(self) -> datetime:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
 
     def _actor(self) -> int | str | None:
         ctx = get_audit_context()
