@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-07-09
+
+### Added
+
+- **`sqlphilosophy.trusted_sql`** — developer-trusted SQL fragment helpers (`sql_table`, `col_eq`, `col_icontains`, `col_range`, order helpers); re-exported from `sqlphilosophy.sql` for compatibility.
+- **Documentation site under `docs/`** — [repository guide](./docs/repository-guide.md), [feature matrix](./docs/feature-matrix.md), and focused usage pages under [`docs/usage/`](./docs/usage/).
+- **Strongly typed repository guide** — [`docs/usage/strongly-typed-repositories.md`](./docs/usage/strongly-typed-repositories.md) (protocols, factories, service patterns).
+- **Before/after SQLAlchemy guide** — [`docs/usage/before-after-sqlalchemy.md`](./docs/usage/before-after-sqlalchemy.md) (sync/async migration examples for SELECT/INSERT/UPDATE/DELETE).
+- Runnable typed repository demos moved to [`docs/examples/typed_repository_sync.py`](./docs/examples/typed_repository_sync.py) and [`docs/examples/typed_repository_async.py`](./docs/examples/typed_repository_async.py) (factory caching, `ListQuery`, `SortConfig`, cross-repo `for_repo`).
+- CI **docs example validation** in the `smoke-package` job.
+
+### Changed
+
+- README rewritten as a concise entry point linking to the expanded docs.
+- **Ruff** replaces Flake8 for lint/format (`pyproject.toml`, CI, RELEASING); removed `.flake8`.
+- Shared partial-update planning in `_repository_shared.PartialUpdatePlan`; production `assert` replaced with explicit validation/errors.
+- Expanded unit tests; removed coverage-chasing test modules; **100%** coverage retained.
+
+### Documentation
+
+- Usage pages for setup, reads, writes, deletes, query builder, sorting, mapping helpers, SQL helpers, trusted SQL, audit, and typing aliases.
+- Feature matrix links each API group to practical usage examples.
+
 ## [0.1.8] - 2026-07-09
 
 ### Added
@@ -78,7 +101,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [RELEASING.md](./RELEASING.md) aligned with current **CI** publish job (not a separate `publish.yml`).
 
-[Unreleased]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.9...HEAD
+[0.1.9]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.7...v0.1.8
 [0.1.3]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/SignalSafeSoftware/sqlphilosophy/releases/tag/v0.1.2
