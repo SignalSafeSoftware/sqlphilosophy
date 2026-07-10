@@ -17,6 +17,7 @@ Portable SQLAlchemy repository kit: sync and async CRUD, fluent statement builde
 | [Repository guide](./docs/repository-guide.md) | Entry point: overview, transaction model, links to usage pages |
 | [Usage examples](./docs/usage/) | Focused sync/async code examples by feature area |
 | [Strongly typed repositories](./docs/usage/strongly-typed-repositories.md) | Typed subclasses, factories, protocols, and service patterns |
+| [Service factory composition](./docs/usage/service-factory-composition.md) | Compose sqlPhilosophy SQL repos with servicePhilosophy business services |
 | [Before/after SQLAlchemy](./docs/usage/before-after-sqlalchemy.md) | Migration examples: direct SQLAlchemy vs repository-centered code |
 | [Feature matrix](./docs/feature-matrix.md) | Full sync/async capability map |
 | [Typed repository (sync)](./docs/examples/typed_repository_sync.py) | Runnable factory + domain repo example |

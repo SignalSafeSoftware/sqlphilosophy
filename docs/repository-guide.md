@@ -15,6 +15,45 @@ Runnable typed-repository demos:
 
 One repository wraps **one SQLAlchemy mapped model** and one **session** (`Session` or `AsyncSession`). It is the application-facing entry point for CRUD, fluent reads, mapping helpers, and (optionally) cross-model navigation through a factory.
 
+### Relationship to servicePhilosophy
+
+```text
+ServiceRepository[FactoryT] is a neutral factory-aware base.
+It does not require a model.
+BaseRepository[ModelT, FactoryT] remains the SQL/model-backed specialization.
+```
+
+`BaseRepository[ModelT, FactoryT]` and `AsyncBaseRepository[ModelT, FactoryT]` inherit from [`ServiceRepository[FactoryT]`](https://github.com/SignalSafeSoftware/servicephilosophy). Factory storage and access live on the shared base; sqlPhilosophy adds the mapped **model**, **session**, and CRUD/query behavior.
+
+| Accessor | Behavior |
+|----------|----------|
+| `.factory` | Returns the configured factory; raises `FactoryRequiredError` when missing |
+| `.maybe_factory` | Returns the factory or `None` |
+| `.has_factory` | `True` when a factory was passed at construction |
+
+`ServiceRepository` itself does **not** require a model. Application services that only need factory wiring can use `servicephilosophy` directly:
+
+```python
+from servicephilosophy import ServiceRepository
+
+
+class PermissionService(ServiceRepository[ServiceFactory]):
+    def can_view(self, user_id: int, resource_id: int) -> bool:
+        return self.factory.repositories.users().exists(user_id)
+```
+
+SQL repositories remain model-bound:
+
+```python
+from sqlphilosophy.sync.repository import BaseRepository
+
+user_repo = BaseRepository(User, session, factory)
+```
+
+`for_repo()` requires a factory. Calling it on a repository constructed without one raises `FactoryRequiredError` (from `servicephilosophy`), not `RuntimeError`. Pass a factory to `BaseRepository(model, session, factory)` or use `self.has_factory` before cross-repo navigation.
+
+See [integration/servicephilosophy.md](./integration/servicephilosophy.md) for adoption notes and [usage/service-factory-composition.md](./usage/service-factory-composition.md) for a full composition example (`ServiceFactory` → `.repositories` + `.services`).
+
 ### What this package does
 
 - Sync and async repository CRUD (`BaseRepository`, `AsyncBaseRepository`)
@@ -55,7 +94,7 @@ Subclass `BaseRepository[Model, AppFactory]` / `AsyncBaseRepository[Model, AppFa
 - **Full guide:** [usage/strongly-typed-repositories.md](./usage/strongly-typed-repositories.md) — protocols, type aliases, services, cross-repo workflows, recommended layout, common mistakes.
 - **Runnable demos:** [typed_repository_sync.py](./examples/typed_repository_sync.py), [typed_repository_async.py](./examples/typed_repository_async.py)
 
-Use `factory.get_repository(UserRepository)` for typed access, `factory.repository(User)` for generic CRUD, and `repo.for_repo(OrderRepository)` to hop between repos on the same session. Pass a factory whenever you call `for_repo()`.
+Use `factory.get_repository(UserRepository)` for typed access, `factory.repository(User)` for generic CRUD, and `repo.for_repo(OrderRepository)` to hop between repos on the same session. Pass a factory whenever you call `for_repo()`; otherwise `FactoryRequiredError` is raised.
 
 **Migrating from raw SQLAlchemy?** See [usage/before-after-sqlalchemy.md](./usage/before-after-sqlalchemy.md) for side-by-side SELECT/INSERT/UPDATE/DELETE examples.
 
@@ -73,6 +112,7 @@ Use `factory.get_repository(UserRepository)` for typed access, `factory.reposito
 | Fluent query builder (composition + terminals) | [usage/query-builder.md](./usage/query-builder.md) |
 | Pagination and sorting (`ListQuery`, `SortConfig`) | [usage/sorting-pagination.md](./usage/sorting-pagination.md) |
 | Typed repositories and factories | [usage/typed-repositories.md](./usage/typed-repositories.md) |
+| **Service + SQL factory composition** | [usage/service-factory-composition.md](./usage/service-factory-composition.md) |
 | **Strongly typed repositories** | [usage/strongly-typed-repositories.md](./usage/strongly-typed-repositories.md) |
 | **Before/after SQLAlchemy** | [usage/before-after-sqlalchemy.md](./usage/before-after-sqlalchemy.md) |
 | SQL helpers (`sqlphilosophy.sql`) | [usage/sql-helpers.md](./usage/sql-helpers.md) |

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 if TYPE_CHECKING:
     from sqlphilosophy.aio.repository import AsyncBaseRepository
 
+from servicephilosophy import RepositoryFactoryProtocol, ServiceRepositoryProtocol
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
@@ -18,14 +19,35 @@ T = TypeVar("T", bound=DeclarativeBase)
 R = TypeVar("R", bound="AsyncBaseRepository[Any, Any]")
 
 
-class AsyncBaseRepositoryProtocol[T: DeclarativeBase, U: AsyncRepositoryFactory | None](
+class AsyncRepositoryFactory(RepositoryFactoryProtocol, Protocol):
+    """Async session-scoped factory for statement builders and entity repositories."""
+
+    def create_statement(self, model: type[T]) -> AsyncStatementQueryBuilder[T]:
+        """Return a fluent async read builder for ``model``."""
+        ...
+
+    def get_repository(self, repo_class: type[R]) -> R:
+        """Return a cached typed entity repository."""
+        ...
+
+    def repository(self, model: type[T]) -> AsyncBaseRepositoryProtocol[T, AsyncRepositoryFactory]:
+        """Return generic CRUD helpers for ``model`` (``AsyncBaseRepository``)."""
+        ...
+
+
+class AsyncBaseRepositoryProtocol[T: DeclarativeBase, U: AsyncRepositoryFactory](
+    ServiceRepositoryProtocol[U],
     Protocol,
 ):
-    """Generic read/write surface shared by sqlphilosophy ``AsyncBaseRepository[T]``."""
+    """Async SQL read/write surface for ``AsyncBaseRepository[T]``.
+
+    Factory access (``.factory``, ``.maybe_factory``, ``.has_factory``) is inherited
+    from ``ServiceRepositoryProtocol``; this protocol adds the mapped model, session,
+    and SQLAlchemy CRUD/query methods only.
+    """
 
     model: type[T]
     _session: AsyncSession
-    _factory: U | None
 
     async def get(self, obj_id: PrimaryKey, load_relations: Any = None) -> T: ...
 
@@ -88,19 +110,3 @@ class AsyncBaseRepositoryProtocol[T: DeclarativeBase, U: AsyncRepositoryFactory 
         values: RowMapping,
         params: RowMapping | None = None,
     ) -> int: ...
-
-
-class AsyncRepositoryFactory(Protocol):
-    """Session-scoped factory for async statement builders and entity repositories."""
-
-    def create_statement(self, model: type[T]) -> AsyncStatementQueryBuilder[T]:
-        """Return a fluent async read builder for ``model``."""
-        ...
-
-    def get_repository(self, repo_class: type[R]) -> R:
-        """Return a cached typed entity repository."""
-        ...
-
-    def repository(self, model: type[T]) -> AsyncBaseRepositoryProtocol[T, AsyncRepositoryFactory | None]:
-        """Return generic CRUD helpers for ``model`` (``AsyncBaseRepository`` in Phobos)."""
-        ...

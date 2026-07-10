@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any, cast
 
+from servicephilosophy import ServiceRepository
 from sqlalchemy import delete, func, select, update
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,18 +41,18 @@ from sqlphilosophy.types import (
 LoadRelations = Sequence[LoaderOption]
 
 
-class AsyncBaseRepository[T: DeclarativeBase, U: AsyncRepositoryFactory | None]:
+class AsyncBaseRepository[T: DeclarativeBase, U: AsyncRepositoryFactory](ServiceRepository[U]):
     """Async session-scoped CRUD helpers for a single mapped model."""
 
     def __init__(
         self,
         model: type[T],
         session: AsyncSession,
-        factory: AsyncRepositoryFactory | None = None,
+        factory: U | None = None,
     ) -> None:
+        super().__init__(factory)
         self.model = model
         self._session = session
-        self._factory = factory
         self._pk_column = require_single_column_primary_key(model, self.inspect_model(model))
 
     @classmethod
@@ -375,12 +376,14 @@ class AsyncBaseRepository[T: DeclarativeBase, U: AsyncRepositoryFactory | None]:
 
     def statement(self) -> AsyncStatementQueryBuilder[T]:
         """Return a fluent statement builder for reads on this model (default read path)."""
-        if self._factory is not None:
-            return self._factory.create_statement(self.model)
+        factory = self.maybe_factory
+        if factory is not None:
+            return factory.create_statement(self.model)
         return AsyncSqlAlchemyStatementBuilder(self._session, self.model)
 
     def for_repo[R: AsyncBaseRepository[Any, Any]](self, repo_class: type[R]) -> R:
-        """Return a typed entity repository sharing this session and factory."""
-        if self._factory is None:
-            raise RuntimeError("for_repo() requires an AsyncRepositoryFactory")
-        return cast(R, self._factory.get_repository(repo_class))
+        """Return a typed entity repository sharing this session and factory.
+
+        Raises ``FactoryRequiredError`` when no factory was configured.
+        """
+        return cast(R, self.factory.get_repository(repo_class))

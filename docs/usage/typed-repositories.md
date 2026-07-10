@@ -4,7 +4,32 @@
 
 Subclass repositories for domain methods; use a session-scoped factory to cache repos and share `statement()` builders.
 
+## Layering with servicePhilosophy
+
+```text
+ServiceRepository[FactoryT] is a neutral factory-aware base.
+It does not require a model.
+BaseRepository[ModelT, FactoryT] remains the SQL/model-backed specialization.
+```
+
+`BaseRepository[ModelT, FactoryT]` extends `ServiceRepository[FactoryT]` from [`servicephilosophy`](https://github.com/SignalSafeSoftware/servicephilosophy). The SQL layer requires a model and session; `ServiceRepository` alone does not.
+
+Repositories inherit `.factory`, `.maybe_factory`, and `.has_factory`. Accessing `.factory` or calling `for_repo()` without a configured factory raises `FactoryRequiredError`.
+
+Business logic with no ORM model can live in a `ServiceRepository` subclass:
+
+```python
+from servicephilosophy import ServiceRepository
+
+
+class PermissionService(ServiceRepository[ServiceFactory]):
+    def can_view(self, user_id: int, resource_id: int) -> bool:
+        return self.factory.repositories.users().exists(user_id)
+```
+
 **In-depth guide:** [strongly-typed-repositories.md](./strongly-typed-repositories.md)
+
+**Composition root (`ServiceFactory` + `.repositories` / `.services`):** [service-factory-composition.md](./service-factory-composition.md)
 
 **Full runnable examples:**
 
@@ -60,7 +85,7 @@ See the typed examples for `SessionRepositoryFactory` with a `dict` cache per se
 
 ## `for_repo` — cross-repository usage
 
-Requires a factory on the repository.
+Requires a factory on the repository. Without one, `for_repo()` raises `FactoryRequiredError` from `servicephilosophy`.
 
 ```python
 # sync

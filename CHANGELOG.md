@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-10
+
+### Added
+
+- Dependency on [`servicephilosophy`](https://github.com/SignalSafeSoftware/servicephilosophy) (`servicephilosophy>=0.1.0`).
+- Protocol tests for `ServiceRepositoryProtocol` / `RepositoryFactoryProtocol` layering (`tests/test_protocols.py`).
+
+### Changed
+
+- `BaseRepository` and `AsyncBaseRepository` now inherit from `ServiceRepository[FactoryT]` (factory wiring lives in servicePhilosophy; SQL/model/session behavior remains in sqlPhilosophy).
+- Repositories expose factory accessors from the shared base:
+  - `.factory` — returns the configured factory, or raises `FactoryRequiredError` when missing
+  - `.maybe_factory` — returns the factory or `None`
+  - `.has_factory` — `True` when a factory was provided at construction
+- `BaseRepositoryProtocol` and `AsyncBaseRepositoryProtocol` extend `ServiceRepositoryProtocol`; SQL factory protocols extend `RepositoryFactoryProtocol`.
+
+### Breaking
+
+- `for_repo()` without a configured factory now raises `FactoryRequiredError` from `servicephilosophy` instead of `RuntimeError`. Update exception handlers accordingly.
+
+### Documentation
+
+- [Integration guide](./docs/integration/servicephilosophy.md) — adoption notes for servicePhilosophy.
+- [Service factory composition](./docs/usage/service-factory-composition.md) — `ServiceFactory` with `.repositories` and `.services`.
+- [Release archives](./docs/release.md) — clean `git archive` and upload hygiene.
+- Repository guide and typed-repository usage docs describe the `ServiceRepository` / `BaseRepository` layering and business-service patterns.
+- [Setup](./docs/usage/setup.md) documents PyPI vs optional editable `servicephilosophy` for local development.
+
+### Repository hygiene
+
+- `.gitignore` expanded for virtualenvs, caches, coverage output, build artifacts, macOS metadata, and `*.egg-info`.
+
 ## [0.1.9] - 2026-07-09
 
 ### Added
@@ -101,7 +133,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [RELEASING.md](./RELEASING.md) aligned with current **CI** publish job (not a separate `publish.yml`).
 
-[Unreleased]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.9...HEAD
+[Unreleased]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.9...v0.2.0
 [0.1.9]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.7...v0.1.8
 [0.1.3]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.2...v0.1.3

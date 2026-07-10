@@ -115,4 +115,31 @@ async def main() -> None:
 
 Mirror sync lifecycle with `await` on repository and builder terminal methods.
 
+---
+
+## Package install and local development
+
+`sqlphilosophy` declares [`servicephilosophy`](https://github.com/SignalSafeSoftware/servicephilosophy) as a normal PyPI dependency (`servicephilosophy>=0.1.0`). A fresh clone needs only this repository:
+
+```bash
+uv sync --all-extras
+```
+
+### Editable `servicephilosophy` (optional, local only)
+
+When developing both packages side by side, install the sibling checkout into your virtual environment without committing a path override to `pyproject.toml`:
+
+```bash
+uv pip install -e ../servicephilosophy
+```
+
+Alternatively, add a **temporary** local override in `pyproject.toml` (do not commit):
+
+```toml
+[tool.uv.sources]
+servicephilosophy = { path = "../servicephilosophy", editable = true }
+```
+
+Run `uv lock` after adding or removing that block. CI and other clones resolve `servicephilosophy` from PyPI.
+
 **Next:** [reads.md](./reads.md) · [writes.md](./writes.md)

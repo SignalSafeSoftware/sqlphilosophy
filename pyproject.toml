@@ -24,6 +24,7 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
+    "servicephilosophy>=0.1.0",
     "sqlalchemy>=2.0,<3",
 ]
 

@@ -369,7 +369,7 @@ order_repo = factory.orders()
 pending = await order_repo.statement().where(Order.user_id == 42, Order.status == "pending").scalars().all()
 ```
 
-`for_repo()` requires the repository was constructed **with a factory**; otherwise it raises `RuntimeError`.
+`for_repo()` requires the repository was constructed **with a factory**; otherwise it raises `FactoryRequiredError` from `servicephilosophy`.
 
 ---
 
@@ -439,7 +439,7 @@ with SessionLocal() as session:
 | Authorization inside base repositories | sqlphilosophy does not enforce access control — check in services. |
 | User input as SQL identifiers | Use bind params for values; identifiers only from trusted allowlists ([trusted-sql.md](./trusted-sql.md)). |
 | `from sqlphilosophy import BaseRepository` | Root package exports only `__version__`; import explicit submodules. |
-| `for_repo()` without factory | Pass factory to `BaseRepository(model, session, factory)`. |
+| `for_repo()` without factory | Pass factory to `BaseRepository(model, session, factory)`; missing factory raises `FactoryRequiredError`. |
 | Ignoring `writable` on partial updates | Always allowlist patchable fields in application code. |
 
 ---

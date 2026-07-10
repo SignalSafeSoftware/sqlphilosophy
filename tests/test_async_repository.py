@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
+from servicephilosophy.exceptions import FactoryRequiredError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Load
@@ -37,6 +38,59 @@ class _FakeAsyncFactory(AsyncRepositoryFactory):
 
     def get_repository(self, repo_class: type):
         return repo_class(self._session, self)
+
+    def repository(self, model: type):
+        return AsyncBaseRepository(model, self._session, self)
+
+
+# --- servicephilosophy factory exposure (async) ---
+
+
+@pytest.mark.asyncio
+async def test_async_has_factory_true_when_factory_configured(async_session: AsyncSession) -> None:
+    factory = _FakeAsyncFactory(async_session)
+    repo = AsyncBaseRepository(Widget, async_session, factory)
+    assert repo.has_factory is True
+
+
+@pytest.mark.asyncio
+async def test_async_maybe_factory_returns_factory_when_configured(async_session: AsyncSession) -> None:
+    factory = _FakeAsyncFactory(async_session)
+    repo = AsyncBaseRepository(Widget, async_session, factory)
+    assert repo.maybe_factory is factory
+
+
+@pytest.mark.asyncio
+async def test_async_factory_returns_factory_when_configured(async_session: AsyncSession) -> None:
+    factory = _FakeAsyncFactory(async_session)
+    repo = AsyncBaseRepository(Widget, async_session, factory)
+    assert repo.factory is factory
+
+
+@pytest.mark.asyncio
+async def test_async_has_factory_false_without_factory(async_session: AsyncSession) -> None:
+    repo = AsyncBaseRepository(Widget, async_session)
+    assert repo.has_factory is False
+
+
+@pytest.mark.asyncio
+async def test_async_maybe_factory_is_none_without_factory(async_session: AsyncSession) -> None:
+    repo = AsyncBaseRepository(Widget, async_session)
+    assert repo.maybe_factory is None
+
+
+@pytest.mark.asyncio
+async def test_async_factory_raises_without_factory(async_session: AsyncSession) -> None:
+    repo = AsyncBaseRepository(Widget, async_session)
+    with pytest.raises(FactoryRequiredError, match="factory is required for this operation"):
+        _ = repo.factory
+
+
+@pytest.mark.asyncio
+async def test_async_for_repo_raises_without_factory(async_session: AsyncSession) -> None:
+    repo = AsyncBaseRepository(Widget, async_session)
+    with pytest.raises(FactoryRequiredError, match="factory is required for this operation"):
+        repo.for_repo(_OtherAsyncRepo)
 
 
 @pytest.mark.asyncio
@@ -74,13 +128,6 @@ async def test_async_statement_without_factory(async_session: AsyncSession) -> N
     repo = AsyncBaseRepository(Widget, async_session)
     builder = repo.statement()
     assert isinstance(builder, AsyncSqlAlchemyStatementBuilder)
-
-
-@pytest.mark.asyncio
-async def test_async_for_repo_without_factory_raises(async_session: AsyncSession) -> None:
-    repo = AsyncBaseRepository(Widget, async_session)
-    with pytest.raises(RuntimeError, match="AsyncRepositoryFactory"):
-        repo.for_repo(_OtherAsyncRepo)
 
 
 @pytest.mark.asyncio

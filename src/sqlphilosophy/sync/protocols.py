@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 if TYPE_CHECKING:
     from sqlphilosophy.sync.repository import BaseRepository
 
+from servicephilosophy import RepositoryFactoryProtocol, ServiceRepositoryProtocol
 from sqlalchemy.orm import DeclarativeBase, Session
 
 from sqlphilosophy.sync.query import StatementQueryBuilder
@@ -17,12 +18,35 @@ T = TypeVar("T", bound=DeclarativeBase)
 R = TypeVar("R", bound="BaseRepository[Any, Any]")
 
 
-class BaseRepositoryProtocol[T: DeclarativeBase, U: RepositoryFactory | None](Protocol):
-    """Generic read/write surface shared by sqlphilosophy ``BaseRepository[T]``."""
+class RepositoryFactory(RepositoryFactoryProtocol, Protocol):
+    """Sync session-scoped factory for statement builders and entity repositories."""
+
+    def create_statement(self, model: type[T]) -> StatementQueryBuilder[T]:
+        """Return a fluent read builder for ``model``."""
+        ...
+
+    def get_repository(self, repo_class: type[R]) -> R:
+        """Return a cached typed entity repository."""
+        ...
+
+    def repository(self, model: type[T]) -> BaseRepositoryProtocol[T, RepositoryFactory]:
+        """Return generic CRUD helpers for ``model`` (``BaseRepository``)."""
+        ...
+
+
+class BaseRepositoryProtocol[T: DeclarativeBase, U: RepositoryFactory](
+    ServiceRepositoryProtocol[U],
+    Protocol,
+):
+    """SQL read/write surface for ``BaseRepository[T]``.
+
+    Factory access (``.factory``, ``.maybe_factory``, ``.has_factory``) is inherited
+    from ``ServiceRepositoryProtocol``; this protocol adds the mapped model, session,
+    and SQLAlchemy CRUD/query methods only.
+    """
 
     model: type[T]
     _session: Session
-    _factory: U | None
 
     def get(self, obj_id: PrimaryKey, load_relations: Any = None) -> T: ...
 
@@ -85,19 +109,3 @@ class BaseRepositoryProtocol[T: DeclarativeBase, U: RepositoryFactory | None](Pr
         values: RowMapping,
         params: RowMapping | None = None,
     ) -> int: ...
-
-
-class RepositoryFactory(Protocol):
-    """Session-scoped factory for statement builders and entity repositories."""
-
-    def create_statement(self, model: type[T]) -> StatementQueryBuilder[T]:
-        """Return a fluent read builder for ``model``."""
-        ...
-
-    def get_repository(self, repo_class: type[R]) -> R:
-        """Return a cached typed entity repository."""
-        ...
-
-    def repository(self, model: type[T]) -> BaseRepositoryProtocol[T, RepositoryFactory | None]:
-        """Return generic CRUD helpers for ``model`` (``BaseRepository`` in Phobos)."""
-        ...

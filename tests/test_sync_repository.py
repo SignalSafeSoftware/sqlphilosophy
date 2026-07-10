@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
+from servicephilosophy.exceptions import FactoryRequiredError
 from sqlalchemy import select
 from sqlalchemy.orm import Load, Session
 
@@ -31,10 +32,56 @@ class _FakeFactory(RepositoryFactory):
     def get_repository(self, repo_class: type):
         return repo_class(self._session, self)
 
+    def repository(self, model: type):
+        return BaseRepository(model, self._session, self)
+
 
 class _OtherRepo(BaseRepository[Widget, RepositoryFactory]):
     def __init__(self, session: Session, factory: RepositoryFactory) -> None:
         super().__init__(Widget, session, factory)
+
+
+# --- servicephilosophy factory exposure (sync) ---
+
+
+def test_sync_has_factory_true_when_factory_configured(sync_session: Session) -> None:
+    factory = _FakeFactory(sync_session)
+    repo = BaseRepository(Widget, sync_session, factory)
+    assert repo.has_factory is True
+
+
+def test_sync_maybe_factory_returns_factory_when_configured(sync_session: Session) -> None:
+    factory = _FakeFactory(sync_session)
+    repo = BaseRepository(Widget, sync_session, factory)
+    assert repo.maybe_factory is factory
+
+
+def test_sync_factory_returns_factory_when_configured(sync_session: Session) -> None:
+    factory = _FakeFactory(sync_session)
+    repo = BaseRepository(Widget, sync_session, factory)
+    assert repo.factory is factory
+
+
+def test_sync_has_factory_false_without_factory(sync_session: Session) -> None:
+    repo = BaseRepository(Widget, sync_session)
+    assert repo.has_factory is False
+
+
+def test_sync_maybe_factory_is_none_without_factory(sync_session: Session) -> None:
+    repo = BaseRepository(Widget, sync_session)
+    assert repo.maybe_factory is None
+
+
+def test_sync_factory_raises_without_factory(sync_session: Session) -> None:
+    repo = BaseRepository(Widget, sync_session)
+    with pytest.raises(FactoryRequiredError, match="factory is required for this operation"):
+        _ = repo.factory
+
+
+def test_sync_for_repo_raises_without_factory(sync_session: Session) -> None:
+    repo = BaseRepository(Widget, sync_session)
+    with pytest.raises(FactoryRequiredError, match="factory is required for this operation"):
+        repo.for_repo(_OtherRepo)
 
 
 def test_create_add_get(sync_session: Session) -> None:
@@ -69,12 +116,6 @@ def test_statement_without_factory(sync_session: Session) -> None:
     repo = BaseRepository(Widget, sync_session)
     builder = repo.statement()
     assert isinstance(builder, SqlAlchemyStatementBuilder)
-
-
-def test_for_repo_without_factory_raises(sync_session: Session) -> None:
-    repo = BaseRepository(Widget, sync_session)
-    with pytest.raises(RuntimeError, match="RepositoryFactory"):
-        repo.for_repo(_OtherRepo)
 
 
 def test_for_repo_with_factory(sync_session: Session) -> None:
