@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-30
+
+### Changed
+
+- Updated CI actions and locked development tooling for the maintained release workflow.
+
 ## [0.2.0] - 2026-07-10
 
 ### Added
@@ -133,7 +139,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [RELEASING.md](./RELEASING.md) aligned with current **CI** publish job (not a separate `publish.yml`).
 
-[Unreleased]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.9...v0.2.0
 [0.1.9]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.7...v0.1.8
