@@ -921,11 +921,11 @@ wheels = [
 
 [[package]]
 name = "servicephilosophy"
-version = "0.1.0"
+version = "0.1.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d0/f6/54f2196bd9909ce3217854ed89073971ef6e765591e134d6fc6ac6aefad4/servicephilosophy-0.1.0.tar.gz", hash = "sha256:c6fc92e5dcced8fbf2c3482644cea2b4074a7b7ce9f73883fd6788cad4aad938", size = 5322, upload-time = "2026-07-10T03:01:11.504Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/12/10/42aa9a6a62bb45b5ab587eac0689d9d4ae2e04cd9735935822f21370f4d5/servicephilosophy-0.1.1.tar.gz", hash = "sha256:3b6b18ec560a2ef8bb9656e3e5fd8f495e318a1b0b13768bc07d68b8277fbd31", size = 5398, upload-time = "2026-08-30T10:51:05.228Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3c/be/b69cdbc5606e8ffcf507cae7535f5a690ea6d4afe618f6812c690d4be31c/servicephilosophy-0.1.0-py3-none-any.whl", hash = "sha256:7e35b11afe06545182b8e65f0d09603c3953918d14311bc1a38aad3ee7c78578", size = 5740, upload-time = "2026-07-10T03:01:10.37Z" },
+    { url = "https://files.pythonhosted.org/packages/0f/33/13d7e2dee59ecc4fb7ef410b2f41e1f98269d30f831738251567b6268015/servicephilosophy-0.1.1-py3-none-any.whl", hash = "sha256:a7fbc5f17b68ce1b0f3e86c5b0b80c48aa75be7628cd1ed686092064db56fd95", size = 5737, upload-time = "2026-08-30T10:51:04.291Z" },
 ]
 
 [[package]]
