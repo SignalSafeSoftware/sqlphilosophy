@@ -28,6 +28,8 @@ Portable SQLAlchemy repository kit: sync and async CRUD, fluent statement builde
 - **Repository pattern** for a single mapped model (`BaseRepository`, `AsyncBaseRepository`).
 - **Fluent query builders** with pagination/sort (`StatementQueryBuilder`, `ListQuery`, `SortConfig`).
 - **SQL helpers** for row mapping, partial updates, and developer-defined fragments via **`sqlphilosophy.trusted_sql`**.
+- **Opt-in strict row decoders** via `sqlphilosophy.strict` for non-coercing
+  scalars, timestamps, enums, collections, UUIDs, and recursive JSON.
 - **Optional audit listeners** and timestamp mixins.
 
 ## What this package does not do
@@ -92,6 +94,7 @@ with SessionLocal() as session:
 | `sqlphilosophy` | `__version__` only |
 | `sqlphilosophy.types` | Portable typing aliases |
 | `sqlphilosophy.sql` | Row mapping, partial updates, Core helpers (re-exports `trusted_sql`) |
+| `sqlphilosophy.strict` | Opt-in non-coercing row decoders and strict JSON validation |
 | `sqlphilosophy.trusted_sql` | Developer-trusted SQL fragments — see [SECURITY.md](./SECURITY.md) |
 | `sqlphilosophy.sorting` | `ListQuery`, `SortConfig`, `SortSpec` |
 | `sqlphilosophy.sync` / `sqlphilosophy.aio` | Repositories, query builders, factory protocols |

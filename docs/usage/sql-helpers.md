@@ -52,6 +52,17 @@ user_id = row_int(row, "id")
 # also: row_float, row_json, row_uuid, row_opt_* variants
 
 all_rows = rows_mapping(session.execute(stmt).mappings().all())
+
+For boundaries that must reject database-driver coercions, use the opt-in
+decoders in `sqlphilosophy.strict` (the existing `row_*` helpers remain
+backward-compatible and coercive):
+
+```python
+from sqlphilosophy.strict import strict_row_datetime, strict_row_json_object
+
+created_on = strict_row_datetime(row, "created_on")
+payload = strict_row_json_object(row, "payload")
+```
 ```
 
 ## API dict accessors

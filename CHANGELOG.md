@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+No unreleased changes recorded.
+
+## [0.3.0] - 2026-09-08
+
+### Added
+
+- Opt-in non-coercing row decoders for strict scalar, timestamp, enum,
+  collection, UUID, and recursively validated JSON boundaries.
+
 ## [0.2.1] - 2026-08-30
 
 ### Changed
