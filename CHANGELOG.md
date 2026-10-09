@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-No unreleased changes recorded.
+### Changed
+
+- Support SQLAlchemy 2.1: drop the removed `sqlalchemy.ext.mypy` plugin from the mypy configuration and type scalar counts for 2.1's stricter `Result` typing.
 
 ## [0.3.0] - 2026-09-08
 
