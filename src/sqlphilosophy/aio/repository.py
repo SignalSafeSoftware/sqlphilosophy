@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, cast
+from typing import Any, SupportsInt, cast
 
 from servicephilosophy import ServiceRepository
 from sqlalchemy import delete, func, select, update
@@ -101,7 +101,7 @@ class AsyncBaseRepository[T: DeclarativeBase, U: AsyncRepositoryFactory](Service
     async def scalar_count(self, stmt: SqlSelect, params: SqlBindParams | None = None) -> int:
         """Execute a scalar count/select statement and return ``int``."""
         result = await self._session.execute(stmt, params or {})
-        return int(result.scalar_one())
+        return int(cast("SupportsInt", result.scalar_one()))
 
     async def iter_mappings(self, stmt: SqlSelect, params: SqlBindParams | None = None):
         """Yield each result row as a plain ``dict``."""

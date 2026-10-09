@@ -81,7 +81,6 @@ exclude_also = [
 
 [tool.mypy]
 python_version = "3.12"
-plugins = ["sqlalchemy.ext.mypy.plugin"]
 warn_unused_ignores = true
 
 [tool.ruff]
