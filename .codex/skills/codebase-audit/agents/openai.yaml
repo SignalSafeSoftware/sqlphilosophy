@@ -1,0 +1,3 @@
+interface:
+  display_name: "Codebase Audit"
+  short_description: "Audit code quality, architecture, tests, and security"

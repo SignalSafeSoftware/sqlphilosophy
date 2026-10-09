@@ -1,0 +1,3 @@
+interface:
+  display_name: "Sonar Code Audit"
+  short_description: "Check Sonar diagnostics and quality findings"
