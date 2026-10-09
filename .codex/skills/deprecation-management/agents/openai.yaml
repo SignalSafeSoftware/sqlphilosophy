@@ -1,0 +1,3 @@
+interface:
+  display_name: "Deprecation Management"
+  short_description: "Find and migrate deprecated code safely"
