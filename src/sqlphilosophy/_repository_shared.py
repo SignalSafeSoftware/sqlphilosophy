@@ -8,6 +8,7 @@ from typing import Any, Literal, cast
 
 from sqlalchemy import func
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.sql import SQLColumnExpression
 
 from sqlphilosophy.audit.model import AuditMixin
 from sqlphilosophy.types import PrimaryKey, RowMapping, RowValue, SqlFilter
@@ -112,3 +113,13 @@ def criteria_delete_allowed(criteria: Sequence[SqlFilter]) -> bool:
 def bulk_update_allowed(values: RowMapping) -> bool:
     """True when ``update_where`` has values to apply."""
     return bool(values)
+
+
+def require_lookup_inputs(
+    criteria: Sequence[SqlFilter], columns: Sequence[SQLColumnExpression[object]] | None = None
+) -> None:
+    """Reject accidental unscoped or empty-projection expression lookups."""
+    if not criteria:
+        raise ValueError("lookup criteria must not be empty")
+    if columns is not None and not columns:
+        raise ValueError("lookup projection must not be empty")

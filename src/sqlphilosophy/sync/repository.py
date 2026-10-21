@@ -10,6 +10,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import DeclarativeBase, Session
 from sqlalchemy.orm.interfaces import LoaderOption
+from sqlalchemy.sql import SQLColumnExpression
 
 from sqlphilosophy._repository_shared import (
     bulk_update_allowed,
@@ -17,6 +18,7 @@ from sqlphilosophy._repository_shared import (
     extract_primary_keys,
     lookup_not_found_message,
     require_batch_size,
+    require_lookup_inputs,
     require_page_and_limit,
     require_single_column_primary_key,
 )
@@ -51,6 +53,11 @@ class BaseRepository[T: DeclarativeBase, U: RepositoryFactory](ServiceRepository
         self.model = model
         self._session = session
         self._pk_column = require_single_column_primary_key(model, self.inspect_model(model))
+
+    @property
+    def session(self) -> Session:
+        """Caller-owned session; exposed for composition ownership checks."""
+        return self._session
 
     @classmethod
     def inspect_model(cls, model: type[DeclarativeBase]) -> Any:
@@ -274,20 +281,20 @@ class BaseRepository[T: DeclarativeBase, U: RepositoryFactory](ServiceRepository
         *,
         criteria: Sequence[SqlFilter],
         values: RowMapping,
-        params: SqlBindParams | None = None,
+        params: RowMapping | None = None,
     ) -> int:
         """Bulk UPDATE rows matching ``criteria``; returns affected row count."""
         if not bulk_update_allowed(values):
             return 0
         stmt = update(self.model).where(*criteria).values(**values)
-        result = self._session.execute(stmt, params or {})
+        result = self._session.execute(stmt, dict(params) if params is not None else {})
         return cursor_rowcount(result)
 
     def delete_where(
         self,
         *,
         criteria: Sequence[SqlFilter],
-        params: SqlBindParams | None = None,
+        params: RowMapping | None = None,
     ) -> int:
         """Delete rows matching ``criteria`` via PK lookup + ``delete_many``."""
         if not criteria_delete_allowed(criteria):
@@ -295,7 +302,7 @@ class BaseRepository[T: DeclarativeBase, U: RepositoryFactory](ServiceRepository
         pk_key = self._pk_column.key
         builder = self.statement().select_columns(self._pk_column).where(*criteria)
         if params:
-            builder = builder.with_params(params)
+            builder = builder.with_params(dict(params))
         rows = builder.mappings().all()
         ids = extract_primary_keys(rows, pk_key)
         return self.delete_many(ids)
@@ -333,6 +340,34 @@ class BaseRepository[T: DeclarativeBase, U: RepositoryFactory](ServiceRepository
             total += self.delete_many(ids)
             self._session.commit()
         return total
+
+    def apply_scope(self, statement: StatementQueryBuilder[T]) -> StatementQueryBuilder[T]:
+        """Host override hook, invoked after projection initialization."""
+        return statement
+
+    def find_entity(self, *, criteria: Sequence[SqlFilter], lock: bool = False) -> T | None:
+        require_lookup_inputs(criteria)
+        query = self.apply_scope(self.statement()).where(*criteria)
+        if lock:
+            query = query.with_for_update()
+        return query.scalars().first()
+
+    def find_row(
+        self,
+        *,
+        criteria: Sequence[SqlFilter],
+        columns: Sequence[SQLColumnExpression[object]],
+        lock: bool = False,
+    ) -> RowMapping | None:
+        require_lookup_inputs(criteria, columns)
+        query = self.apply_scope(self.statement().select_columns(*columns)).where(*criteria)
+        if lock:
+            query = query.with_for_update()
+        return query.mappings().first()
+
+    def count_scoped(self, *, criteria: Sequence[SqlFilter]) -> int:
+        require_lookup_inputs(criteria)
+        return self.apply_scope(self.statement().select_entity()).where(*criteria).count()
 
     def statement(self) -> StatementQueryBuilder[T]:
         """Return a fluent statement builder for reads on this model (default read path)."""

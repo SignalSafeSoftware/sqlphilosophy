@@ -7,8 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-10-15
+
+### Added
+
+- Expression-based `find_entity`, projected `find_row`, and `count_scoped` helpers on sync/async repositories, with empty-input validation and optional locking.
+- Overridable `apply_scope` hook applied after projection initialization so policy predicates survive `select_columns` and `select_entity`.
+
+
 ### Changed
 
+- Accept immutable `Mapping` bind parameters consistently in sync/async bulk mutations, matching the public repository protocols.
 - Support SQLAlchemy 2.1: drop the removed `sqlalchemy.ext.mypy` plugin from the mypy configuration and type scalar counts for 2.1's stricter `Result` typing.
 
 ## [0.3.0] - 2026-09-08
@@ -150,7 +159,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [RELEASING.md](./RELEASING.md) aligned with current **CI** publish job (not a separate `publish.yml`).
 
-[Unreleased]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.3.0...v0.3.3
 [0.2.1]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.9...v0.2.0
 [0.1.9]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.8...v0.1.9
@@ -158,3 +168,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.1.3]: https://github.com/SignalSafeSoftware/sqlphilosophy/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/SignalSafeSoftware/sqlphilosophy/releases/tag/v0.1.2
 [0.1.0]: https://github.com/SignalSafeSoftware/sqlphilosophy/releases/tag/v0.1.0
+
+## 0.3.2 — unpublished candidate
+
+Expose readonly sync/async repository session identity so host composition can reject services attached to another transaction.

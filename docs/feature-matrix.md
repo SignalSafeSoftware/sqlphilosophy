@@ -331,3 +331,14 @@ Import submodules explicitly for APIs (`sqlphilosophy.sync.repository`, `sqlphil
 | `Session` | `AsyncSession` |
 | Direct method calls | Prefix with `await` on repo/builder terminals and async-only repo methods |
 | `sqlphilosophy.sql` session helpers | Use sync `Session` or repository async methods for the same workflows |
+
+### Expression lookup additions in 0.3.1
+
+| Capability | Sync | Async |
+| --- | --- | --- |
+| First mapped entity with predicates/optional lock | `find_entity(criteria=..., lock=False)` | `await find_entity(criteria=..., lock=False)` |
+| First projected row with predicates/optional lock | `find_row(criteria=..., columns=..., lock=False)` | `await find_row(criteria=..., columns=..., lock=False)` |
+| Count with required predicates | `count_scoped(criteria=...)` | `await count_scoped(criteria=...)` |
+| Additional policy predicates after projection | Override `apply_scope(statement)` | Override `apply_scope(statement)` |
+
+The policy hook covers these helpers. It does not change the behavior of existing CRUD methods or raw builder calls.
