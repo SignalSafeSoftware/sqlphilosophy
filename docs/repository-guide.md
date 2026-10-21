@@ -128,3 +128,9 @@ Use `factory.get_repository(UserRepository)` for typed access, `factory.reposito
 - **All usage pages:** [usage/](./usage/)
 - **Typed factory demos:** [typed_repository_sync.py](./examples/typed_repository_sync.py), [typed_repository_async.py](./examples/typed_repository_async.py)
 - **Security / trust boundaries:** [SECURITY.md](../SECURITY.md)
+
+## Expression lookups and policy hooks
+
+Version 0.3.1 adds `find_entity(criteria=..., lock=False)`, `find_row(criteria=..., columns=..., lock=False)` and `count_scoped(criteria=...)` to both base repositories. Async variants are awaited. Nonempty SQL-expression criteria are required; rows also require a nonempty projection. These complement equality-based `first(**filters)` and lower-level mapping/statement methods. They do not commit transactions.
+
+Host subclasses can override `apply_scope(statement)` to add policy filters. The helpers invoke it after selecting the entity or projected columns, preserving filters despite the builder's projection reset. The default hook returns the statement unchanged. Existing CRUD and arbitrary `statement()` calls are not automatically scoped by this hook; retain named domain ownership queries and authorization checks.

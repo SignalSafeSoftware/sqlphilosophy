@@ -11,6 +11,7 @@ from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm.interfaces import LoaderOption
+from sqlalchemy.sql import SQLColumnExpression
 
 from sqlphilosophy._repository_shared import (
     bulk_update_allowed,
@@ -19,6 +20,7 @@ from sqlphilosophy._repository_shared import (
     lookup_not_found_message,
     plan_partial_update,
     require_batch_size,
+    require_lookup_inputs,
     require_mappings_page_limits,
     require_page_and_limit,
     require_single_column_primary_key,
@@ -54,6 +56,11 @@ class AsyncBaseRepository[T: DeclarativeBase, U: AsyncRepositoryFactory](Service
         self.model = model
         self._session = session
         self._pk_column = require_single_column_primary_key(model, self.inspect_model(model))
+
+    @property
+    def session(self) -> AsyncSession:
+        """Caller-owned session; exposed for composition ownership checks."""
+        return self._session
 
     @classmethod
     def inspect_model(cls, model: type[DeclarativeBase]) -> Any:
@@ -308,20 +315,20 @@ class AsyncBaseRepository[T: DeclarativeBase, U: AsyncRepositoryFactory](Service
         *,
         criteria: Sequence[SqlFilter],
         values: RowMapping,
-        params: SqlBindParams | None = None,
+        params: RowMapping | None = None,
     ) -> int:
         """Bulk UPDATE rows matching ``criteria``; returns affected row count."""
         if not bulk_update_allowed(values):
             return 0
         stmt = update(self.model).where(*criteria).values(**values)
-        result = await self._session.execute(stmt, params or {})
+        result = await self._session.execute(stmt, dict(params) if params is not None else {})
         return cursor_rowcount(result)
 
     async def delete_where(
         self,
         *,
         criteria: Sequence[SqlFilter],
-        params: SqlBindParams | None = None,
+        params: RowMapping | None = None,
     ) -> int:
         """Delete rows matching ``criteria`` via PK lookup + ``delete_many``."""
         if not criteria_delete_allowed(criteria):
@@ -329,7 +336,7 @@ class AsyncBaseRepository[T: DeclarativeBase, U: AsyncRepositoryFactory](Service
         pk_key = self._pk_column.key
         builder = self.statement().select_columns(self._pk_column).where(*criteria)
         if params:
-            builder = builder.with_params(params)
+            builder = builder.with_params(dict(params))
         rows = await builder.mappings().all()
         ids = extract_primary_keys(rows, pk_key)
         return await self.delete_many(ids)
@@ -373,6 +380,34 @@ class AsyncBaseRepository[T: DeclarativeBase, U: AsyncRepositoryFactory](Service
             total += await self.delete_many(ids)
             await self._session.commit()
         return total
+
+    def apply_scope(self, statement: AsyncStatementQueryBuilder[T]) -> AsyncStatementQueryBuilder[T]:
+        """Host override hook, invoked after projection initialization."""
+        return statement
+
+    async def find_entity(self, *, criteria: Sequence[SqlFilter], lock: bool = False) -> T | None:
+        require_lookup_inputs(criteria)
+        query = self.apply_scope(self.statement()).where(*criteria)
+        if lock:
+            query = query.with_for_update()
+        return await query.scalars().first()
+
+    async def find_row(
+        self,
+        *,
+        criteria: Sequence[SqlFilter],
+        columns: Sequence[SQLColumnExpression[object]],
+        lock: bool = False,
+    ) -> RowMapping | None:
+        require_lookup_inputs(criteria, columns)
+        query = self.apply_scope(self.statement().select_columns(*columns)).where(*criteria)
+        if lock:
+            query = query.with_for_update()
+        return await query.mappings().first()
+
+    async def count_scoped(self, *, criteria: Sequence[SqlFilter]) -> int:
+        require_lookup_inputs(criteria)
+        return await self.apply_scope(self.statement().select_entity()).where(*criteria).count()
 
     def statement(self) -> AsyncStatementQueryBuilder[T]:
         """Return a fluent statement builder for reads on this model (default read path)."""

@@ -1,5 +1,7 @@
 # sqlphilosophy
 
+Current source and planned customer-subdomain impact: [current-state summary](docs/current-state-summary.md).
+
 Portable SQLAlchemy repository kit: sync and async CRUD, fluent statement builders, sort/pagination, Core SQL helpers, and optional audit listeners.
 
 | | |
@@ -140,3 +142,11 @@ See [RELEASING.md](./RELEASING.md) for GitHub + PyPI trusted publishing. See [CH
 ## License
 
 MIT — see [LICENSE](./LICENSE).
+
+## Expression lookups and scope overrides (0.3.1)
+
+Both repository bases provide `find_entity(criteria=..., lock=False)`, `find_row(criteria=..., columns=..., lock=False)` and `count_scoped(criteria=...)`. Criteria must not be empty; projected lookups also require columns. Entity lookups return a mapped object, projected lookups return RowMapping, and absence returns None. These methods never commit.
+
+Override `apply_scope(statement)` for additional predicates on these helpers. It runs after projection initialization, because `select_columns`/`select_entity` reset the builder's SELECT. This hook does not implicitly scope existing CRUD helpers or arbitrary builder calls: keep ownership checks in named application repository methods. Existing `first`, `get_by_id`, `count` and statement APIs remain available and unchanged.
+
+The 0.3.1 artifact is a local candidate until separately published. Dependent candidate packages use a vendored wheel during validation; publish sqlPhilosophy first before replacing their local sources with registry-only dependencies.

@@ -97,6 +97,7 @@ def test_sort_config_literal_sql_and_resolver() -> None:
     )
     expr = get_sort_column(literal, {"id": "desc"})
     assert expr is not None
+    assert "DESC" in str(expr)
 
     def resolver(spec: SortSpec) -> tuple[object, object]:
         return (Widget.id, desc(Widget.name))
@@ -124,3 +125,12 @@ def test_sort_config_literal_sql_requires_string() -> None:
 def test_literal_order_expr_desc() -> None:
     assert literal_order_expr("widget.name DESC") is not None
     assert literal_order_expr("widget.name") is not None
+
+
+def test_resolver_receives_default_for_non_allowlisted_requested_sort() -> None:
+    def resolver(spec: SortSpec) -> tuple[object, object]:
+        return (spec.column, spec.direction)
+
+    sort = SortConfig(default=SortSpec("id", "asc"), resolver=resolver)
+    assert sort.order_clauses({"name": "desc"}) == ("id", "asc")
+    assert sort.order_clauses(None) == ("id", "asc")
