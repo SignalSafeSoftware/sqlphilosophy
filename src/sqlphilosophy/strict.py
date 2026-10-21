@@ -6,7 +6,7 @@ from collections.abc import Callable, Mapping
 from datetime import date, datetime
 from enum import Enum
 from math import isfinite
-from typing import TypeGuard
+from typing import TypeGuard, cast
 from uuid import UUID
 
 from sqlphilosophy.types import JSONValue
@@ -99,12 +99,16 @@ def strict_row_enum[EnumT: Enum](row: Row, key: str, enum_type: type[EnumT]) -> 
     raise _type_error(key, enum_type.__name__, value)
 
 
-def _is_plain_list(value: object) -> TypeGuard[list[object]]:
-    return type(value) is list
+def _plain_list(value: object) -> list[object] | None:
+    if type(value) is not list:
+        return None
+    # Exact built-in type proof preserves identity without inspecting __class__.
+    return cast(list[object], value)
 
 
 def _is_str_list(value: object) -> TypeGuard[list[str]]:
-    return _is_plain_list(value) and all(type(item) is str for item in value)
+    items = _plain_list(value)
+    return items is not None and all(type(item) is str for item in items)
 
 
 def strict_row_str_list(row: Row, key: str) -> list[str]:
@@ -119,8 +123,9 @@ def is_strict_json_value(value: object) -> TypeGuard[JSONValue]:
         return True
     if type(value) is float:
         return isfinite(value)
-    if _is_plain_list(value):
-        return all(is_strict_json_value(item) for item in value)
+    items = _plain_list(value)
+    if items is not None:
+        return all(is_strict_json_value(item) for item in items)
     if type(value) is dict:
         return all(type(key) is str and is_strict_json_value(item) for key, item in value.items())
     return False
