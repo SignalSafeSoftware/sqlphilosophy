@@ -16,15 +16,16 @@ def test_sync_mutations_accept_immutable_parameters(sync_session: Session) -> No
     repository = BaseRepository(Widget, sync_session)
     widget = repository.create(name="before", active=True)
     parameters: RowMapping = MappingProxyType({"chosen_id": widget.id})
-    assert repository.update_where(
-        criteria=[Widget.id == bindparam("chosen_id")],
-        values={"name": "after"},
-        params=parameters,
-    ) == 1
+    assert (
+        repository.update_where(
+            criteria=[Widget.id == bindparam("chosen_id")],
+            values={"name": "after"},
+            params=parameters,
+        )
+        == 1
+    )
     assert parameters == {"chosen_id": widget.id}
-    assert repository.delete_where(
-        criteria=[Widget.id == bindparam("chosen_id")], params=parameters
-    ) == 1
+    assert repository.delete_where(criteria=[Widget.id == bindparam("chosen_id")], params=parameters) == 1
     assert parameters == {"chosen_id": widget.id}
 
 
@@ -32,13 +33,14 @@ async def test_async_mutations_accept_immutable_parameters(async_session: AsyncS
     repository = AsyncBaseRepository(Widget, async_session)
     widget = await repository.create(name="before", active=True)
     parameters: RowMapping = MappingProxyType({"chosen_id": widget.id})
-    assert await repository.update_where(
-        criteria=[Widget.id == bindparam("chosen_id")],
-        values={"name": "after"},
-        params=parameters,
-    ) == 1
+    assert (
+        await repository.update_where(
+            criteria=[Widget.id == bindparam("chosen_id")],
+            values={"name": "after"},
+            params=parameters,
+        )
+        == 1
+    )
     assert parameters == {"chosen_id": widget.id}
-    assert await repository.delete_where(
-        criteria=[Widget.id == bindparam("chosen_id")], params=parameters
-    ) == 1
+    assert await repository.delete_where(criteria=[Widget.id == bindparam("chosen_id")], params=parameters) == 1
     assert parameters == {"chosen_id": widget.id}
