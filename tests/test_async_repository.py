@@ -139,8 +139,9 @@ async def test_async_for_repo_with_factory(async_session: AsyncSession) -> None:
 
 
 def test_async_composite_pk_rejected() -> None:
+    mock_session = MagicMock()
     with pytest.raises(TypeError, match="single-column primary key"):
-        AsyncBaseRepository(WidgetTag, MagicMock())
+        AsyncBaseRepository(WidgetTag, mock_session)
 
 
 @pytest.mark.asyncio
@@ -186,10 +187,12 @@ async def test_async_batched_purge_ids(async_session: AsyncSession) -> None:
 async def test_async_batched_purge_ids_rejects_invalid_batch_size(async_session: AsyncSession) -> None:
     repo = AsyncBaseRepository(Widget, async_session)
     await repo.create(name="b1")
+    predicate = Widget.name.like("b%")
     with pytest.raises(ValueError, match="batch_size must be >= 1"):
-        await repo.batched_purge_ids(criteria=[Widget.name.like("b%")], batch_size=0)
+        await repo.batched_purge_ids(criteria=[predicate], batch_size=0)
+    predicate = Widget.name.like("b%")
     with pytest.raises(ValueError, match="batch_size must be >= 1"):
-        await repo.batched_purge_ids(criteria=[Widget.name.like("b%")], batch_size=-1)
+        await repo.batched_purge_ids(criteria=[predicate], batch_size=-1)
     assert await repo.count() == 1
 
 
@@ -211,10 +214,12 @@ async def test_async_get_many_with_load_relations(async_session: AsyncSession) -
 @pytest.mark.asyncio
 async def test_async_fetch_mappings_page_rejects_negative_limits(async_session: AsyncSession) -> None:
     repo = AsyncBaseRepository(Widget, async_session)
+    statement = select(Widget.id)
     with pytest.raises(ValueError, match="limit must be >= 0"):
-        await repo.fetch_mappings_page(select(Widget.id), limit=-1, offset=0)
+        await repo.fetch_mappings_page(statement, limit=-1, offset=0)
+    statement = select(Widget.id)
     with pytest.raises(ValueError, match="offset must be >= 0"):
-        await repo.fetch_mappings_page(select(Widget.id), limit=1, offset=-1)
+        await repo.fetch_mappings_page(statement, limit=1, offset=-1)
 
 
 @pytest.mark.asyncio
@@ -293,8 +298,9 @@ async def test_async_update_partial_rejects_unexpected_plan_action(
         return PartialUpdatePlan("invalid", {"name": "y"})  # type: ignore[arg-type]
 
     monkeypatch.setattr("sqlphilosophy.aio.repository.plan_partial_update", bad_plan)
+    allowed_fields = frozenset({"name"})
     with pytest.raises(RuntimeError, match="unexpected partial update plan action"):
-        await repo.update_partial(created.id, {"name": "y"}, frozenset({"name"}))
+        await repo.update_partial(created.id, {"name": "y"}, allowed_fields)
 
 
 @pytest.mark.asyncio

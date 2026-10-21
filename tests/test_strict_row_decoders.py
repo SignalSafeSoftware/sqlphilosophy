@@ -103,3 +103,26 @@ def test_strict_json_guard_and_optional_decoder() -> None:
     assert strict_row_optional({"x": 4}, "x", strict_row_int) == 4
     with pytest.raises(TypeError):
         strict_row_optional({"x": "4"}, "x", strict_row_int)
+
+
+def test_strict_list_decoders_retain_identity_and_reject_subclasses() -> None:
+    class ListSubclass(list[str]):
+        pass
+
+    original = ["one", "two"]
+    assert strict_row_str_list({"items": original}, "items") is original
+    subclass = ListSubclass(original)
+    assert not is_strict_json_value(subclass)
+    with pytest.raises(TypeError, match="expected strict list"):
+        strict_row_str_list({"items": subclass}, "items")
+
+
+def test_strict_list_decoders_do_not_inspect_arbitrary_object_attributes() -> None:
+    class AttributeTrap:
+        def __getattribute__(self, name: str) -> object:
+            raise AssertionError(f"unexpected attribute access: {name}")
+
+    value = AttributeTrap()
+    assert not is_strict_json_value(value)
+    with pytest.raises(TypeError, match="expected strict list"):
+        strict_row_str_list({"items": value}, "items")

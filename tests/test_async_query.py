@@ -96,8 +96,9 @@ async def test_async_limit_offset_validation(async_session) -> None:
         b.limit(-1)
     with pytest.raises(ValueError, match="offset must be >= 0"):
         b.offset(-1)
+    invalid_page = ListQuery(offset=0, limit=-1)
     with pytest.raises(ValueError, match="limit must be >= 0"):
-        await b.fetch_page(ListQuery(offset=0, limit=-1), sort=None)
+        await b.fetch_page(invalid_page, sort=None)
 
 
 @pytest.mark.asyncio
@@ -177,8 +178,9 @@ async def test_async_count_on_literal_select_and_zero_limit_page(async_session) 
     rows, total = await empty.fetch_page(ListQuery(offset=0, limit=0))
     assert rows == []
     assert total == 1
+    invalid_page = ListQuery(offset=0, limit=-1)
     with pytest.raises(ValueError, match="limit must be >= 0"):
-        await empty.fetch_page(ListQuery(offset=0, limit=-1))
+        await empty.fetch_page(invalid_page)
     assert (
         await AsyncSqlAlchemyStatementBuilder(async_session, Widget)
         .select_entity()
@@ -208,8 +210,9 @@ async def test_async_query_builder_extended_join_and_correlate(async_session) ->
     _, total = await b2.fetch_page(ListQuery(offset=0, limit=1))
     assert total >= 1
     assert await b2.count_distinct(Widget.id) >= 1
+    invalid_page = ListQuery(offset=-1, limit=1)
     with pytest.raises(ValueError, match="offset must be >= 0"):
-        await b2.fetch_page(ListQuery(offset=-1, limit=1))
+        await b2.fetch_page(invalid_page)
 
 
 @pytest.mark.asyncio
