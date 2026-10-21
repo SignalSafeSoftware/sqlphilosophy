@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-10-21
+
+### Changed
+
+- Document repository-first query/scope ownership and exact-list decoder protections; retain SQLAlchemy 2.x compatibility and caller-owned transactions. Require the coordinated servicephilosophy 0.1.2 baseline.
+- Bound build tooling to vetted setuptools 84.2.1+ within major 84 and wheel 0.46+ below 1.
+- Release preparation only; publication is a separate approved operation.
+
 ## [0.3.3] - 2026-10-15
 
 ### Added

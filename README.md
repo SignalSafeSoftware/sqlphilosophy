@@ -143,10 +143,20 @@ See [RELEASING.md](./RELEASING.md) for GitHub + PyPI trusted publishing. See [CH
 
 MIT — see [LICENSE](./LICENSE).
 
-## Expression lookups and scope overrides (0.3.1)
+## Expression lookups and scope overrides (0.3+)
 
 Both repository bases provide `find_entity(criteria=..., lock=False)`, `find_row(criteria=..., columns=..., lock=False)` and `count_scoped(criteria=...)`. Criteria must not be empty; projected lookups also require columns. Entity lookups return a mapped object, projected lookups return RowMapping, and absence returns None. These methods never commit.
 
 Override `apply_scope(statement)` for additional predicates on these helpers. It runs after projection initialization, because `select_columns`/`select_entity` reset the builder's SELECT. This hook does not implicitly scope existing CRUD helpers or arbitrary builder calls: keep ownership checks in named application repository methods. Existing `first`, `get_by_id`, `count` and statement APIs remain available and unchanged.
 
-The 0.3.1 artifact is a local candidate until separately published. Dependent candidate packages use a vendored wheel during validation; publish sqlPhilosophy first before replacing their local sources with registry-only dependencies.
+Published 0.3.3 provides these lookup APIs. The 0.3.4 source prepares compatible
+strict-decoder, documentation and build-metadata fixes. Use a named application
+repository method to own each model-specific projection, ordering and policy;
+compose its query with `statement()` or these lookup helpers instead of
+scattering `select()` calls through controllers/services. Core SQL helpers remain
+available for explicit SQL boundaries; a repository does not supply authorization.
+
+The supported dependency range remains SQLAlchemy 2.x. DeliveryPlus native's
+2.0.49 constraint and RuleAtlas's separate 2.1.5 minimum are host decisions;
+upgrading this package does not silently change either host lock. Coordinated
+candidate verification exercises both SQLAlchemy versions before release.

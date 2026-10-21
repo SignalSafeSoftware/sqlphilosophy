@@ -983,11 +983,11 @@ wheels = [
 
 [[package]]
 name = "servicephilosophy"
-version = "0.1.1"
+version = "0.1.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/12/10/42aa9a6a62bb45b5ab587eac0689d9d4ae2e04cd9735935822f21370f4d5/servicephilosophy-0.1.1.tar.gz", hash = "sha256:3b6b18ec560a2ef8bb9656e3e5fd8f495e318a1b0b13768bc07d68b8277fbd31", size = 5398, upload-time = "2026-08-30T10:51:05.228Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/86/1a/878b7922221729357e6e95950311818d739fa0412d842b447f5eb08d351a/servicephilosophy-0.1.2.tar.gz", hash = "sha256:1e615744d8109e18b33804644f988b8af0158ed122892db591bbeaec32a3500f", size = 5599, upload-time = "2026-10-21T22:08:52.474Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0f/33/13d7e2dee59ecc4fb7ef410b2f41e1f98269d30f831738251567b6268015/servicephilosophy-0.1.1-py3-none-any.whl", hash = "sha256:a7fbc5f17b68ce1b0f3e86c5b0b80c48aa75be7628cd1ed686092064db56fd95", size = 5737, upload-time = "2026-08-30T10:51:04.291Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/28/1dafbe6eec03da9a0a40a99426255165d5ed85c7d87a447bb8322ccc4412/servicephilosophy-0.1.2-py3-none-any.whl", hash = "sha256:97588644657f1637b9de303f8e0f7a7a6aafef5ac3097c6b4e2d19d19cd5d807", size = 6056, upload-time = "2026-10-21T22:08:51.401Z" },
 ]
 
 [[package]]
@@ -1092,7 +1092,7 @@ dev = [
 requires-dist = [
     { name = "aiosqlite", marker = "extra == 'dev'", specifier = ">=0.20" },
     { name = "bandit", marker = "extra == 'dev'", specifier = ">=1.7" },
-    { name = "build", marker = "extra == 'dev'", specifier = ">=1.2" },
+    { name = "build", marker = "extra == 'dev'", specifier = ">=1.6.1,<2" },
     { name = "greenlet", marker = "extra == 'async'", specifier = ">=3.0" },
     { name = "greenlet", marker = "extra == 'dev'", specifier = ">=3.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11" },
@@ -1100,7 +1100,7 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15" },
-    { name = "servicephilosophy", specifier = ">=0.1.0" },
+    { name = "servicephilosophy", specifier = ">=0.1.2,<0.2" },
     { name = "sqlalchemy", specifier = ">=2.0,<3" },
     { name = "twine", marker = "extra == 'dev'", specifier = ">=5" },
     { name = "types-greenlet", marker = "extra == 'dev'", specifier = ">=3.0" },

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=69", "wheel"]
+requires = ["setuptools>=84.2.1,<85", "wheel>=0.46,<1"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -24,7 +24,7 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    "servicephilosophy>=0.1.0",
+    "servicephilosophy>=0.1.2,<0.2",
     "sqlalchemy>=2.0,<3",
 ]
 
@@ -38,7 +38,7 @@ dev = [
     "pytest-cov>=6",
     "aiosqlite>=0.20",
     "greenlet>=3.0",
-    "build>=1.2",
+    "build>=1.6.1,<2",
     "twine>=5",
     "ruff>=0.15",
     "mypy>=1.11",
