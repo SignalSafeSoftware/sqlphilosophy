@@ -81,9 +81,10 @@ def test_sort_config_invalid_sort_raises_with_strict_policy() -> None:
 
 
 def test_sort_config_rejects_unknown_invalid_policy() -> None:
+    default_sort = SortSpec("id", "asc")
     with pytest.raises(ValueError, match='invalid must be "default" or "raise"'):
         SortConfig(
-            default=SortSpec("id", "asc"),
+            default=default_sort,
             columns={"id": {"asc": Widget.id}},
             invalid="ignore",  # type: ignore[arg-type]
         )
@@ -108,8 +109,9 @@ def test_sort_config_literal_sql_and_resolver() -> None:
 
 
 def test_sort_config_requires_columns_or_resolver() -> None:
+    default_sort = SortSpec("id", "asc")
     with pytest.raises(ValueError, match="requires columns or resolver"):
-        SortConfig(default=SortSpec("id", "asc"))
+        SortConfig(default=default_sort)
 
 
 def test_sort_config_literal_sql_requires_string() -> None:

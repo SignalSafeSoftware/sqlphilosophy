@@ -159,16 +159,18 @@ async def test_async_batched_purge_ids_batches_and_commits(async_session: AsyncS
 @pytest.mark.parametrize("batch_size", [0, -1])
 def test_sync_batched_purge_ids_rejects_invalid_batch_size(sync_session: Session, batch_size: int) -> None:
     repo = BaseRepository(Widget, sync_session)
+    predicate = Widget.name.like("x%")
     with pytest.raises(ValueError, match="batch_size must be >= 1"):
-        repo.batched_purge_ids(criteria=[Widget.name.like("x%")], batch_size=batch_size)
+        repo.batched_purge_ids(criteria=[predicate], batch_size=batch_size)
 
 
 @pytest.mark.parametrize("batch_size", [0, -1])
 @pytest.mark.asyncio
 async def test_async_batched_purge_ids_rejects_invalid_batch_size(async_session: AsyncSession, batch_size: int) -> None:
     repo = AsyncBaseRepository(Widget, async_session)
+    predicate = Widget.name.like("x%")
     with pytest.raises(ValueError, match="batch_size must be >= 1"):
-        await repo.batched_purge_ids(criteria=[Widget.name.like("x%")], batch_size=batch_size)
+        await repo.batched_purge_ids(criteria=[predicate], batch_size=batch_size)
 
 
 @pytest.mark.parametrize(

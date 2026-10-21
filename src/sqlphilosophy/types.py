@@ -65,4 +65,4 @@ type OrmModel = type[DeclarativeBase]
 
 def cursor_rowcount(result: Result[Any]) -> int:
     """Return affected row count from a DML ``execute`` result."""
-    return int(cast(CursorResult[Any], result).rowcount or 0)
+    return int(cast("CursorResult[Any]", result).rowcount or 0)

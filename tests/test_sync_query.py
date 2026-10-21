@@ -97,8 +97,9 @@ def test_limit_offset_validation(sync_session) -> None:
         b.limit(-1)
     with pytest.raises(ValueError, match="offset must be >= 0"):
         b.offset(-1)
+    invalid_page = ListQuery(offset=0, limit=-1)
     with pytest.raises(ValueError, match="limit must be >= 0"):
-        b.fetch_page(ListQuery(offset=0, limit=-1), sort=None)
+        b.fetch_page(invalid_page, sort=None)
 
 
 def test_join_distinct_group_by(sync_session) -> None:
@@ -233,8 +234,9 @@ def test_fetch_page_rejects_negative_offset(sync_session) -> None:
     rows, total = b2.fetch_page(ListQuery(offset=0, limit=1))
     assert total >= 1
     assert len(rows) == 1
+    invalid_page = ListQuery(offset=-1, limit=1)
     with pytest.raises(ValueError, match="offset must be >= 0"):
-        b2.fetch_page(ListQuery(offset=-1, limit=1))
+        b2.fetch_page(invalid_page)
 
 
 def test_apply_sort_then_count_and_fetch_page(sync_session) -> None:

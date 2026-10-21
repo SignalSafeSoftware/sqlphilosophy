@@ -319,8 +319,9 @@ def test_row_coercion_rejects_invalid_types() -> None:
         row_uuid({"x": 1}, "x")
     with pytest.raises((TypeError, ValueError)):
         row_opt_uuid({"x": 1}, "x")
+    invalid_timestamp = datetime.now()
     with pytest.raises(TypeError):
-        row_json({"x": datetime.now()}, "x")
+        row_json({"x": invalid_timestamp}, "x")
     with pytest.raises(TypeError):
         row_opt_json_object({"x": []}, "x")
 
@@ -404,8 +405,9 @@ def test_count_from_table_without_criteria(sync_session: Session) -> None:
 
 
 def test_apply_mappings_page_rejects_negative_offset(sync_session: Session) -> None:
+    statement = select(Widget.id)
     with pytest.raises(ValueError, match="offset must be >= 0"):
-        apply_mappings_page(sync_session, select(Widget.id), limit=1, offset=-1)
+        apply_mappings_page(sync_session, statement, limit=1, offset=-1)
 
 
 def test_col_range_lte_and_merge_criteria_none() -> None:
@@ -416,8 +418,9 @@ def test_col_range_lte_and_merge_criteria_none() -> None:
 
 
 def test_order_by_allowlist_rejects_unknown_key() -> None:
+    allowed_fields = frozenset({"name"})
     with pytest.raises(ValueError, match="invalid order key"):
-        order_by_allowlist("bad", {"name": "n ASC"}, allowlist=frozenset({"name"}))
+        order_by_allowlist("bad", {"name": "n ASC"}, allowlist=allowed_fields)
 
 
 def test_partial_update_model_audit_path_with_extra_values(sync_session: Session) -> None:
@@ -482,8 +485,9 @@ def test_partial_update_model_rejects_unexpected_plan_action(
         return PartialUpdatePlan("invalid", {"name": "y"})  # type: ignore[arg-type]
 
     monkeypatch.setattr("sqlphilosophy.sql.plan_partial_update", bad_plan)
+    allowed_fields = frozenset({"name"})
     with pytest.raises(RuntimeError, match="unexpected partial update plan action"):
-        partial_update_model(sync_session, Widget, row.id, {"name": "y"}, frozenset({"name"}))
+        partial_update_model(sync_session, Widget, row.id, {"name": "y"}, allowed_fields)
 
 
 def test_partial_update_model_audit_touch_and_extra_values(sync_session: Session) -> None:

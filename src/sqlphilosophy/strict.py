@@ -99,9 +99,17 @@ def strict_row_enum[EnumT: Enum](row: Row, key: str, enum_type: type[EnumT]) -> 
     raise _type_error(key, enum_type.__name__, value)
 
 
+def _is_plain_list(value: object) -> TypeGuard[list[object]]:
+    return type(value) is list
+
+
+def _is_str_list(value: object) -> TypeGuard[list[str]]:
+    return _is_plain_list(value) and all(type(item) is str for item in value)
+
+
 def strict_row_str_list(row: Row, key: str) -> list[str]:
     value = _required(row, key)
-    if type(value) is not list or not all(type(item) is str for item in value):
+    if not _is_str_list(value):
         raise _type_error(key, "list[str]", value)
     return value
 
@@ -111,7 +119,7 @@ def is_strict_json_value(value: object) -> TypeGuard[JSONValue]:
         return True
     if type(value) is float:
         return isfinite(value)
-    if type(value) is list:
+    if _is_plain_list(value):
         return all(is_strict_json_value(item) for item in value)
     if type(value) is dict:
         return all(type(key) is str and is_strict_json_value(item) for key, item in value.items())

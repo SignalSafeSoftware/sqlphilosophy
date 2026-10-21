@@ -126,8 +126,9 @@ def test_for_repo_with_factory(sync_session: Session) -> None:
 
 
 def test_composite_primary_key_rejected() -> None:
+    mock_session = MagicMock()
     with pytest.raises(TypeError, match="single-column primary key"):
-        BaseRepository(WidgetTag, MagicMock())
+        BaseRepository(WidgetTag, mock_session)
 
 
 def test_get_raises_lookup(sync_session: Session) -> None:
@@ -176,10 +177,12 @@ def test_batched_purge_ids(sync_session: Session) -> None:
 def test_batched_purge_ids_rejects_invalid_batch_size(sync_session: Session) -> None:
     repo = BaseRepository(Widget, sync_session)
     repo.create(name="b1")
+    predicate = Widget.name.like("b%")
     with pytest.raises(ValueError, match="batch_size must be >= 1"):
-        repo.batched_purge_ids(criteria=[Widget.name.like("b%")], batch_size=0)
+        repo.batched_purge_ids(criteria=[predicate], batch_size=0)
+    predicate = Widget.name.like("b%")
     with pytest.raises(ValueError, match="batch_size must be >= 1"):
-        repo.batched_purge_ids(criteria=[Widget.name.like("b%")], batch_size=-1)
+        repo.batched_purge_ids(criteria=[predicate], batch_size=-1)
     assert repo.count() == 1
 
 
