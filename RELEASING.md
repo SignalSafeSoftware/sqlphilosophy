@@ -1,7 +1,6 @@
 # Releasing `sqlphilosophy`
 
-The source prepares **0.3.4**. This is an approval candidate, not a declaration
-that publication happened. Repository: [SignalSafeSoftware/sqlphilosophy](https://github.com/SignalSafeSoftware/sqlphilosophy).
+The current release is **0.3.5**, verified from actual PyPI wheel/sdist metadata and runtime bytes at source commit `730e85d86a34ba56e83c2db4b0cfc68f2aab92af`. Repository: [SignalSafeSoftware/sqlphilosophy](https://github.com/SignalSafeSoftware/sqlphilosophy).
 
 ## Checks and artifacts
 
@@ -45,7 +44,7 @@ scan and package smoke; a skipped/failed scan cannot publish.
 
 **Manual dispatch on `main` is a publishing action.** It is not a check-only preview.
 After explicit release approval and all required checks, use the exact approved
-`v0.3.4` tag on the reviewed main commit (or the existing approved main dispatch).
+`v0.3.5` tag on the reviewed main commit (or the existing approved main dispatch).
 A PR, release note or this file does not itself authorize tag creation or upload.
 Do not retag or retry a version until registry readback proves whether it exists.
 
