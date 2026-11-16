@@ -6,10 +6,11 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from typing import Any, cast
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.sql import Select
+from sqlalchemy.sql.selectable import Subquery
 
 from sqlphilosophy.sorting import ListQuery, OrderByMap, SortConfig
 from sqlphilosophy.sql import count_composed_select, row_mapping, row_mapping_opt, rows_mapping
@@ -113,6 +114,16 @@ class AsyncStatementQueryBuilder[T: DeclarativeBase](ABC):
 
     @abstractmethod
     def as_cte(self, name: str) -> SqlClause:
+        raise NotImplementedError
+
+    def as_subquery(self, name: str | None = None) -> Subquery:
+        """Snapshot this composed selection for another repository-owned builder."""
+        raise NotImplementedError
+
+    def union_all[Other: DeclarativeBase](
+        self, *others: AsyncStatementQueryBuilder[Other]
+    ) -> AsyncStatementQueryBuilder[T]:
+        """Compose same-session, equally shaped selections without changing either arm."""
         raise NotImplementedError
 
     @abstractmethod
@@ -327,6 +338,31 @@ class AsyncSqlAlchemyStatementBuilder[T: DeclarativeBase](AsyncStatementQueryBui
 
     def as_cte(self, name: str) -> SqlClause:
         return self._stmt.cte(name)
+
+    def as_subquery(self, name: str | None = None) -> Subquery:
+        return self._stmt.params(**self._params).subquery(name)
+
+    def union_all[Other: DeclarativeBase](
+        self, *others: AsyncStatementQueryBuilder[Other]
+    ) -> AsyncSqlAlchemyStatementBuilder[T]:
+        if not others:
+            raise ValueError("Union composition requires another selection")
+        statements = [self._stmt]
+        params = dict(self._params)
+        for other in others:
+            if not isinstance(other, AsyncSqlAlchemyStatementBuilder) or other._session is not self._session:
+                raise ValueError("Union composition requires builders sharing the same session")
+            if len(other._stmt.selected_columns) != len(self._stmt.selected_columns):
+                raise ValueError("Union selections require the same number of columns")
+            if any(key in params and params[key] != value for key, value in other._params.items()):
+                raise ValueError("Union selections have conflicting bound parameters")
+            params.update(other._params)
+            statements.append(other._stmt)
+        rows = union_all(*statements).subquery()
+        composed = self._copy()
+        composed._stmt = select(rows)
+        composed._params = params
+        return composed
 
     def order_by(self, *clauses: SqlClause) -> AsyncSqlAlchemyStatementBuilder[T]:
         self._stmt = self._stmt.order_by(*clauses)

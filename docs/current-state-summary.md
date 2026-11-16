@@ -1,3 +1,13 @@
+# sqlPhilosophy current state — 2026-11-15
+
+Source candidate: 0.3.5, based on remote main 9228a4c7b2a16541980e0e2ee52d65a16d05921d. Public registry baseline verified as 0.3.4. Publication and host adoption require separate recorded results; this source document does not certify them.
+
+The compatible additions are explicit composite identities, exact repository registration and repository-owned UNION ALL/subquery composition. Hosts retain policy, authorization, session/cache lifecycle and transactions. No host API, database selection or transport enters this library. Registry builders preserve exact model/session/factory identity; query composition preserves each authored scope and rejects conflicting binds.
+
+See [the repository guide](repository-guide.md), [examples](examples/) and [changelog](../CHANGELOG.md). SQLAlchemy support remains 2.x.
+
+## Prior release record
+
 # sqlPhilosophy source and release preparation
 
 Source baseline: verified main `57b82f96ee887f0c42faeb5dfa8c970995981060`.
