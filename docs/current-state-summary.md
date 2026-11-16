@@ -1,6 +1,6 @@
 # sqlPhilosophy current state — 2026-11-15
 
-Source candidate: 0.3.5, based on remote main 9228a4c7b2a16541980e0e2ee52d65a16d05921d. Public registry baseline verified as 0.3.4. Publication and host adoption require separate recorded results; this source document does not certify them.
+Current verified release: 0.3.5. [The tag pipeline](https://github.com/SignalSafeSoftware/sqlphilosophy/actions/runs/43797501217) passed and anonymous PyPI wheel/sdist readback matched the tagged runtime source at `730e85d86a34ba56e83c2db4b0cfc68f2aab92af`. Consumer adoption remains a separate check.
 
 The compatible additions are explicit composite identities, exact repository registration and repository-owned UNION ALL/subquery composition. Hosts retain policy, authorization, session/cache lifecycle and transactions. No host API, database selection or transport enters this library. Registry builders preserve exact model/session/factory identity; query composition preserves each authored scope and rejects conflicting binds.
 
