@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-11-15
+
+### Added
+
+- Opt-in synchronous composite-key repositories with explicit identity and writable-field validation.
+- Exact model-to-repository registries for synchronous and asynchronous factories; callers retain session, cache and transaction ownership.
+- Same-session UNION ALL and subquery projection composition, with column-count and bound-parameter conflict checks.
+- Public repository protocols declare the existing session, scope and entity-lookup contracts.
+
+
 ## [0.3.4] - 2026-10-21
 
 ### Changed

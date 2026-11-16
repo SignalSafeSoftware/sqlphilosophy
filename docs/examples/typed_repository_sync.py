@@ -17,6 +17,7 @@ import sqlphilosophy
 from sqlphilosophy.sorting import ListQuery, SortConfig, SortSpec
 from sqlphilosophy.sync.protocols import RepositoryFactory
 from sqlphilosophy.sync.query import SqlAlchemyStatementBuilder, StatementQueryBuilder
+from sqlphilosophy.sync.registry import RepositoryRegistry
 from sqlphilosophy.sync.repository import BaseRepository
 from sqlphilosophy.types import PrimaryKey, RowMapping
 
@@ -95,6 +96,19 @@ class UserRepository(BaseRepository[User, "AppRepositoryFactory"]):
         )
         return self.statement().where(User.is_active.is_(True)).fetch_page(query, sort=sort)
 
+    def all_status_rows(self) -> list[RowMapping]:
+        active = self.statement().select_columns(User.id, User.username).where(User.is_active.is_(True))
+        inactive = self.statement().select_columns(User.id, User.username).where(User.is_active.is_(False))
+        combined = active.union_all(inactive).as_subquery("all_users")
+        return (
+            self.statement()
+            .select_columns(combined.c.id, combined.c.username)
+            .select_from(combined)
+            .order_by(combined.c.id)
+            .mappings()
+            .all()
+        )
+
     def pending_order_count(self, user_id: PrimaryKey) -> int:
         return self.for_repo(OrderRepository).count_for_user(user_id, status="pending")
 
@@ -155,6 +169,8 @@ class SessionRepositoryFactory:
     def __init__(self, session: Session) -> None:
         self._session = session
         self._repositories: dict[Any, Any] = {}
+        self._registry = RepositoryRegistry[AppRepositoryFactory]()
+        self._registry.register(User, lambda current_session, factory: UserRepository(current_session, factory))
 
     def create_statement(self, model: type[T]) -> StatementQueryBuilder[T]:
         return SqlAlchemyStatementBuilder(self._session, model)
@@ -171,7 +187,7 @@ class SessionRepositoryFactory:
         return cast(U, cached)
 
     def repository(self, model: type[T]) -> BaseRepository[T, AppRepositoryFactory]:
-        return BaseRepository(model, self._session, cast(AppRepositoryFactory, self))
+        return self._registry.repository(model, self._session, cast(AppRepositoryFactory, self))
 
     def companies(self) -> CompanyRepository:
         return self.get_repository(CompanyRepository)
@@ -220,6 +236,7 @@ def main() -> None:
         assert users.get_by_email("alice@acme.com") is not None
         assert users.get_active_by_email("bob@abc.com") is None
         assert len(users.active_users()) == 1
+        assert [row["username"] for row in users.all_status_rows()] == ["alice", "bob"]
         assert len(users.list_for_company(acme.id)) == 1
 
         rows, total = users.search_page(ListQuery.from_page(page=1, size=10, order_by={"email": "asc"}))
@@ -235,6 +252,7 @@ def main() -> None:
         assert companies.count_users(acme.id) == 1
 
         generic_users = factory.repository(User)
+        assert isinstance(generic_users, UserRepository)
         assert generic_users.count(is_active=True) == 1
 
         other_users = generic_users.for_repo(UserRepository)

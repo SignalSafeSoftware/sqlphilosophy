@@ -134,3 +134,23 @@ Use `factory.get_repository(UserRepository)` for typed access, `factory.reposito
 Version 0.3.1 adds `find_entity(criteria=..., lock=False)`, `find_row(criteria=..., columns=..., lock=False)` and `count_scoped(criteria=...)` to both base repositories. Async variants are awaited. Nonempty SQL-expression criteria are required; rows also require a nonempty projection. These complement equality-based `first(**filters)` and lower-level mapping/statement methods. They do not commit transactions.
 
 Host subclasses can override `apply_scope(statement)` to add policy filters. The helpers invoke it after selecting the entity or projected columns, preserving filters despite the builder's projection reset. The default hook returns the statement unchanged. Existing CRUD and arbitrary `statement()` calls are not automatically scoped by this hook; retain named domain ownership queries and authorization checks.
+
+## Explicit model repository resolution
+
+`RepositoryRegistry` in `sqlphilosophy.sync.registry` and `AsyncRepositoryRegistry`
+in `sqlphilosophy.aio.registry` provide exact model-to-builder registration. For example:
+
+```python
+registry.register(
+    Widget,
+    lambda session, factory: WidgetRepository(Widget, session, factory),
+)
+repository = registry.repository(Widget, session, factory)
+```
+
+A factory can delegate its existing `repository(model)` implementation to this resolver.
+Unregistered models receive the generic repository; registered builders must retain the
+exact model, session and factory. Duplicate registrations fail. There is no subclass
+scanning, naming inference, global registry or session cache. Factory implementations
+retain cache ownership and callers retain transaction ownership. Async repository
+construction itself is synchronous; its read/write methods are awaited as usual.

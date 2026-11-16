@@ -160,3 +160,17 @@ The supported dependency range remains SQLAlchemy 2.x. DeliveryPlus native's
 2.0.49 constraint and RuleAtlas's separate 2.1.5 minimum are host decisions;
 upgrading this package does not silently change either host lock. Coordinated
 candidate verification exercises both SQLAlchemy versions before release.
+
+### Explicit composite-key resources
+
+
+`sqlphilosophy.sync.composite.CompositeRepository` is an opt-in repository for mapped composite primary keys. It validates complete ordered identities and preserves caller-owned transactions, scoped reads, locks and writable allowlists. Existing `BaseRepository` and asynchronous scalar APIs are unchanged. ApiPhilosophy resource adapters select this repository only through an explicit host `composite_repository(model)` resolver.
+
+
+Repository-owned projections may compose same-session selections with
+`first.union_all(second).as_subquery("combined")` and use the returned `.c` columns
+in another repository statement. The UNION builder snapshots both scoped arms; it
+does not add scopes or change either arm. Apply each repository's visibility scope
+before composition. Column counts must agree and conflicting explicit bound
+parameters are rejected. `as_subquery()` preserves bound values. Sync and async
+builders support the same API; execute the outer projection through its builder.
