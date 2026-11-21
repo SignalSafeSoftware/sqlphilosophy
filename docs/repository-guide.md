@@ -154,3 +154,12 @@ exact model, session and factory. Duplicate registrations fail. There is no subc
 scanning, naming inference, global registry or session cache. Factory implementations
 retain cache ownership and callers retain transaction ownership. Async repository
 construction itself is synchronous; its read/write methods are awaited as usual.
+
+
+### Metadata-only statements
+
+Use `SqlAlchemyStatementBuilder.for_metadata(Model)` to compose a mapped subquery
+without constructing a database session, for example while declaring read-only ORM
+metadata. The fluent SQL composition methods and `build_select()` remain available.
+Execution terminals (including scalar, mapping, count and pagination helpers) raise
+`RuntimeError`; use a normal session-bound builder for runtime database reads.

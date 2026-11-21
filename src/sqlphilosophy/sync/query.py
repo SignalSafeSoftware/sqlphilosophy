@@ -234,11 +234,21 @@ class _SqlAlchemyScalarResult[T: DeclarativeBase](_ScalarResult[T]):
 
 
 class SqlAlchemyStatementBuilder[T: DeclarativeBase](StatementQueryBuilder[T]):
-    def __init__(self, session: Session, entity_class: type[T]) -> None:
+    def __init__(self, session: Session | None, entity_class: type[T]) -> None:
         self._session = session
         self._entity_class = entity_class
         self._stmt: Select[Any] = select(entity_class)
         self._params: RowMapping = {}
+
+    @classmethod
+    def for_metadata(cls, entity_class: type[T]) -> SqlAlchemyStatementBuilder[T]:
+        """Compose mapped SQL metadata without creating a session or allowing execution."""
+        return cls(None, entity_class)
+
+    def _require_session(self) -> Session:
+        if self._session is None:
+            raise RuntimeError("Metadata-only statement builders cannot execute queries")
+        return self._session
 
     def _copy(self) -> SqlAlchemyStatementBuilder[T]:
         """Return a builder snapshot for terminal helpers that must not mutate ``self``."""
@@ -389,28 +399,28 @@ class SqlAlchemyStatementBuilder[T: DeclarativeBase](StatementQueryBuilder[T]):
 
     def count(self) -> int:
         count_stmt = count_composed_select(self._stmt)
-        return int(self._session.execute(count_stmt, cast(Mapping[str, Any], self._params)).scalar_one() or 0)
+        return int(self._require_session().execute(count_stmt, cast(Mapping[str, Any], self._params)).scalar_one() or 0)
 
     def count_distinct(self, *columns: SqlClause) -> int:
         count_stmt = select(func.count(func.distinct(*columns)))
         count_stmt = count_stmt.select_from(*self._stmt.get_final_froms())
         if self._stmt.whereclause is not None:
             count_stmt = count_stmt.where(self._stmt.whereclause)
-        return int(self._session.execute(count_stmt, cast(Mapping[str, Any], self._params)).scalar_one() or 0)
+        return int(self._require_session().execute(count_stmt, cast(Mapping[str, Any], self._params)).scalar_one() or 0)
 
     def scalar(self) -> Any | None:
         """Return the first column of the first row, or ``None`` when no row matches.
 
         Raises ``MultipleResultsFound`` when more than one row is returned.
         """
-        return self._session.execute(self._stmt, cast(Mapping[str, Any], self._params)).scalar_one_or_none()
+        return self._require_session().execute(self._stmt, cast(Mapping[str, Any], self._params)).scalar_one_or_none()
 
     def scalar_one(self) -> Any:
         """Return exactly one scalar value; raise when zero or multiple rows match."""
-        return self._session.execute(self._stmt, cast(Mapping[str, Any], self._params)).scalar_one()
+        return self._require_session().execute(self._stmt, cast(Mapping[str, Any], self._params)).scalar_one()
 
     def mappings(self) -> _SqlAlchemyMappingResult:
-        return _SqlAlchemyMappingResult(self._session, self._stmt, self._params)
+        return _SqlAlchemyMappingResult(self._require_session(), self._stmt, self._params)
 
     def fetch_page(
         self,
@@ -430,7 +440,7 @@ class SqlAlchemyStatementBuilder[T: DeclarativeBase](StatementQueryBuilder[T]):
         return rows, total
 
     def scalars(self) -> _SqlAlchemyScalarResult[T]:
-        return _SqlAlchemyScalarResult(self._session, self._stmt, self._params)
+        return _SqlAlchemyScalarResult(self._require_session(), self._stmt, self._params)
 
     def build_select(self) -> Select[tuple[object, ...]]:
         return cast(Select[tuple[object, ...]], self._stmt)
