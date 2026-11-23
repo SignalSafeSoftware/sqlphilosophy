@@ -96,8 +96,9 @@ def test_union_rejects_missing_foreign_or_mismatched_selections(builder, session
     for other in (object(), builder(session_class(), Widget)):
         with pytest.raises(ValueError, match="same session"):
             first.union_all(other)
+    unmatched = builder(session, Widget)
     with pytest.raises(ValueError, match="number of columns"):
-        first.union_all(builder(session, Widget))
+        first.union_all(unmatched)
     first.with_params({"name": "one"})
     second = builder(session, Widget).select_columns(Widget.id).with_params({"name": "two"})
     with pytest.raises(ValueError, match="conflicting bound"):

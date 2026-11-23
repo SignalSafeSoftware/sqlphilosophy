@@ -229,7 +229,7 @@ class BaseRepository[T: DeclarativeBase, U: RepositoryFactory](ServiceRepository
         if join_on is not None:  # noqa: SIM108
             stmt = stmt.join(target_model, join_on)
         else:
-            stmt = stmt.join(target_model)  # pragma: no cover
+            stmt = stmt.join(target_model)
         if filter_expressions:
             stmt = stmt.where(*filter_expressions)
         return cast(Sequence[tuple[T, Any]], self._session.execute(stmt).all())
