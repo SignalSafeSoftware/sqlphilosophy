@@ -26,8 +26,9 @@ def test_composite_repository_rejects_renamed_primary_key_writes_before_sql() ->
         repository = CompositeRepository(RenamedIdentity, session, None)
         repository.add(RenamedIdentity(tenant_id=1, item_id=1, name="Original"))
         for identity_field in ("tenant_id", "item_id"):
+            writable = frozenset({identity_field, "name"})
             with pytest.raises(ValueError, match="non-identity writable"):
-                repository.update_partial((1, 1), {identity_field: 2}, frozenset({identity_field, "name"}))
+                repository.update_partial((1, 1), {identity_field: 2}, writable)
         assert repository.update_partial((1, 1), {"name": "Changed"}, frozenset({"name"})) == 1
         row = repository.find_entity(criteria=repository.criteria((1, 1)))
         assert row is not None

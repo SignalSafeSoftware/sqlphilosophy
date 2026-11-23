@@ -84,8 +84,9 @@ def test_composite_lookup_preserves_repository_scope_and_lock(composite_session:
 
 @pytest.mark.parametrize("identity", [(), (1,), (1, 2, 3), [1, 2], "1,2", (True, 2), (1, "2"), (1.0, 2), (None, 2)])
 def test_composite_criteria_rejects_missing_and_wrong_scalar_components(composite_session: Session, identity) -> None:
+    repo = repository(composite_session)
     with pytest.raises(ValueError, match="identity"):
-        repository(composite_session).criteria(identity)
+        repo.criteria(identity)
 
 
 def test_composite_requires_multiple_primary_columns(composite_session: Session) -> None:
@@ -119,7 +120,8 @@ def test_composite_updates_enforce_mapped_nonidentity_allowlist(composite_sessio
 def test_composite_duplicate_failure_remains_caller_rollback(composite_session: Session) -> None:
     repo = repository(composite_session)
     repo.add(Membership(tenant_id=1, user_id=1, title="First"))
+    duplicate = Membership(tenant_id=1, user_id=1, title="Duplicate")
     with pytest.raises(IntegrityError):
-        repo.add(Membership(tenant_id=1, user_id=1, title="Duplicate"))
+        repo.add(duplicate)
     composite_session.rollback()
     assert composite_session.scalars(select(Membership)).all() == []
