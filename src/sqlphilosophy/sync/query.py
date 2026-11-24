@@ -196,7 +196,7 @@ class StatementQueryBuilder[T: DeclarativeBase](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def build_select(self) -> Select[tuple[object, ...]]:
+    def build_select(self) -> Select[object, *tuple[object, ...]]:
         """Return the composed SELECT (debug/logging only; execute via builder methods)."""
 
 
@@ -442,8 +442,8 @@ class SqlAlchemyStatementBuilder[T: DeclarativeBase](StatementQueryBuilder[T]):
     def scalars(self) -> _SqlAlchemyScalarResult[T]:
         return _SqlAlchemyScalarResult(self._require_session(), self._stmt, self._params)
 
-    def build_select(self) -> Select[tuple[object, ...]]:
-        return cast(Select[tuple[object, ...]], self._stmt)
+    def build_select(self) -> Select[object, *tuple[object, ...]]:
+        return cast(Select[object, *tuple[object, ...]], self._stmt)
 
 
 def lateral_from(select_stmt: Select[Any], name: str) -> SqlClause:

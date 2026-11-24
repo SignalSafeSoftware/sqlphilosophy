@@ -50,7 +50,7 @@ jobs:
 
             - name: Mypy
               if: matrix.python-version == '3.12'
-              run: .venv/bin/mypy src --install-types --non-interactive
+              run: .venv/bin/mypy --strict src tests/typing --install-types --non-interactive
 
             - name: Bandit
               if: matrix.python-version == '3.12'

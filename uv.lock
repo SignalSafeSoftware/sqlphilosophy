@@ -1270,7 +1270,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15" },
     { name = "servicephilosophy", specifier = ">=0.1.2,<0.2" },
-    { name = "sqlalchemy", specifier = ">=2.0,<3" },
+    { name = "sqlalchemy", specifier = ">=2.1.9,<2.2" },
     { name = "twine", marker = "extra == 'dev'", specifier = ">=5" },
     { name = "types-greenlet", marker = "extra == 'dev'", specifier = ">=3.0" },
 ]

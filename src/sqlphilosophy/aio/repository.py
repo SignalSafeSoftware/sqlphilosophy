@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 from typing import Any, SupportsInt, cast
 
 from servicephilosophy import ServiceRepository
 from sqlalchemy import delete, func, select, update
 from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.engine import ScalarResult
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm.interfaces import LoaderOption
-from sqlalchemy.sql import SQLColumnExpression
+from sqlalchemy.sql import Select, SQLColumnExpression
 
 from sqlphilosophy._repository_shared import (
     bulk_update_allowed,
@@ -87,12 +88,12 @@ class AsyncBaseRepository[T: DeclarativeBase, U: AsyncRepositoryFactory](Service
         """True when ``table_name`` exists on the session connection."""
         return table_name in await self.list_table_names()
 
-    def _apply_load_relations(self, stmt: Any, load_relations: LoadRelations | None) -> Any:
+    def _apply_load_relations(self, stmt: Select[T], load_relations: LoadRelations | None) -> Select[T]:
         if load_relations:
             return stmt.options(*load_relations)
         return stmt
 
-    async def _scalar_result(self, stmt: Any, *, unique: bool = False) -> Any:
+    async def _scalar_result(self, stmt: Select[T], *, unique: bool = False) -> ScalarResult[T]:
         result = await self._session.scalars(stmt)
         if unique:
             return result.unique()
@@ -110,7 +111,7 @@ class AsyncBaseRepository[T: DeclarativeBase, U: AsyncRepositoryFactory](Service
         result = await self._session.execute(stmt, params or {})
         return int(cast("SupportsInt", result.scalar_one()))
 
-    async def iter_mappings(self, stmt: SqlSelect, params: SqlBindParams | None = None):
+    async def iter_mappings(self, stmt: SqlSelect, params: SqlBindParams | None = None) -> AsyncIterator[RowMapping]:
         """Yield each result row as a plain ``dict``."""
         result = await self._session.execute(stmt, params or {})
         for row in result.mappings():
@@ -421,4 +422,4 @@ class AsyncBaseRepository[T: DeclarativeBase, U: AsyncRepositoryFactory](Service
 
         Raises ``FactoryRequiredError`` when no factory was configured.
         """
-        return cast(R, self.factory.get_repository(repo_class))
+        return self.factory.get_repository(repo_class)

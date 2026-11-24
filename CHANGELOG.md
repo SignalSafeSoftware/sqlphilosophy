@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - Prepared 2026-11-24
+
+### Changed
+
+- Require SQLAlchemy 2.1.9 or newer within 2.1; retain existing query, scope and transaction behavior.
+- Migrate public statement rows to SQLAlchemy 2.1 variadic `Select` annotations. Entity loading and scalar-result helpers retain their mapped model type.
+- Enforce strict package and consumer typing checks alongside the existing 100% branch coverage gate.
+
+Publication is a separate authorized action; the existing 0.3.x release remains available for SQLAlchemy 2.0 consumers.
+
 ## [0.3.5] - 2026-11-15
 
 ### Added

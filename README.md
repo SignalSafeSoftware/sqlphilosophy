@@ -180,3 +180,7 @@ does not add scopes or change either arm. Apply each repository's visibility sco
 before composition. Column counts must agree and conflicting explicit bound
 parameters are rejected. `as_subquery()` preserves bound values. Sync and async
 builders support the same API; execute the outer projection through its builder.
+
+## SQLAlchemy 2.1 migration
+
+Version 0.4.0 requires SQLAlchemy `>=2.1.9,<2.2`. SQLAlchemy now types a single selected model as `Select[Model]` instead of `Select[tuple[Model]]`. Public composed statements use variadic row annotations; callers should use repository `scalars()`/`find_entity()` for model results and explicit row decoders for projections. Query execution, repository scopes, locks and caller-owned transactions are unchanged. Keep the 0.3.x release for SQLAlchemy 2.0 applications.

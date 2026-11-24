@@ -195,7 +195,7 @@ class AsyncStatementQueryBuilder[T: DeclarativeBase](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def build_select(self) -> Select[tuple[object, ...]]:
+    def build_select(self) -> Select[object, *tuple[object, ...]]:
         """Return the composed SELECT (debug/logging only; execute via builder methods)."""
 
 
@@ -452,5 +452,5 @@ class AsyncSqlAlchemyStatementBuilder[T: DeclarativeBase](AsyncStatementQueryBui
     def scalars(self) -> _AsyncSqlAlchemyScalarResult[T]:
         return _AsyncSqlAlchemyScalarResult(self._session, self._stmt, self._params)
 
-    def build_select(self) -> Select[tuple[object, ...]]:
-        return cast(Select[tuple[object, ...]], self._stmt)
+    def build_select(self) -> Select[object, *tuple[object, ...]]:
+        return cast(Select[object, *tuple[object, ...]], self._stmt)

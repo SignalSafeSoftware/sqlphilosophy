@@ -25,7 +25,7 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
     "servicephilosophy>=0.1.2,<0.2",
-    "sqlalchemy>=2.0,<3",
+    "sqlalchemy>=2.1.9,<2.2",
 ]
 
 [project.optional-dependencies]
