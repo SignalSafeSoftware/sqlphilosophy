@@ -1,5 +1,11 @@
 # sqlphilosophy
 
+[![Build](https://github.com/SignalSafeSoftware/sqlphilosophy/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/SignalSafeSoftware/sqlphilosophy/actions/workflows/ci.yml)
+[![Quality gate](https://sonarcloud.io/api/project_badges/measure?project=SignalSafeSoftware_sqlphilosophy&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=SignalSafeSoftware_sqlphilosophy)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=SignalSafeSoftware_sqlphilosophy&metric=coverage)](https://sonarcloud.io/summary/new_code?id=SignalSafeSoftware_sqlphilosophy)
+[![PyPI version](https://img.shields.io/pypi/v/sqlphilosophy?logo=pypi)](https://pypi.org/project/sqlphilosophy/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/SignalSafeSoftware/sqlphilosophy/blob/main/LICENSE)
+
 Current source and planned customer-subdomain impact: [current-state summary](docs/current-state-summary.md).
 
 Portable SQLAlchemy repository kit: sync and async CRUD, fluent statement builders, sort/pagination, Core SQL helpers, and optional audit listeners.
