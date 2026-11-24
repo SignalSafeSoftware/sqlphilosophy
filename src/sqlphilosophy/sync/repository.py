@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from typing import Any, SupportsInt, cast
 
 from servicephilosophy import ServiceRepository
 from sqlalchemy import delete, func, select, update
 from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.engine import ScalarResult
 from sqlalchemy.orm import DeclarativeBase, Session
 from sqlalchemy.orm.interfaces import LoaderOption
-from sqlalchemy.sql import SQLColumnExpression
+from sqlalchemy.sql import Select, SQLColumnExpression
 
 from sqlphilosophy._repository_shared import (
     bulk_update_allowed,
@@ -76,12 +77,12 @@ class BaseRepository[T: DeclarativeBase, U: RepositoryFactory](ServiceRepository
         """True when ``table_name`` exists on the session connection."""
         return table_name in self.list_table_names()
 
-    def _apply_load_relations(self, stmt: Any, load_relations: LoadRelations | None) -> Any:
+    def _apply_load_relations(self, stmt: Select[T], load_relations: LoadRelations | None) -> Select[T]:
         if load_relations:
             return stmt.options(*load_relations)
         return stmt
 
-    def _scalar_result(self, stmt: Any, *, unique: bool = False) -> Any:
+    def _scalar_result(self, stmt: Select[T], *, unique: bool = False) -> ScalarResult[T]:
         if unique:
             return self._session.scalars(stmt).unique()
         return self._session.scalars(stmt)
@@ -96,7 +97,7 @@ class BaseRepository[T: DeclarativeBase, U: RepositoryFactory](ServiceRepository
         """Execute a scalar count/select statement and return ``int``."""
         return int(cast("SupportsInt", self._session.execute(stmt, params or {}).scalar_one()))
 
-    def iter_mappings(self, stmt: SqlSelect, params: SqlBindParams | None = None):
+    def iter_mappings(self, stmt: SqlSelect, params: SqlBindParams | None = None) -> Iterator[RowMapping]:
         """Yield each result row as a plain ``dict``."""
         for row in self._session.execute(stmt, params or {}).mappings():
             yield dict(row)
@@ -381,4 +382,4 @@ class BaseRepository[T: DeclarativeBase, U: RepositoryFactory](ServiceRepository
 
         Raises ``FactoryRequiredError`` when no factory was configured.
         """
-        return cast(R, self.factory.get_repository(repo_class))
+        return self.factory.get_repository(repo_class)

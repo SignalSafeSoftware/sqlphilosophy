@@ -1,6 +1,6 @@
 # Releasing `sqlphilosophy`
 
-The current release is **0.3.5**, verified from actual PyPI wheel/sdist metadata and runtime bytes at source commit `730e85d86a34ba56e83c2db4b0cfc68f2aab92af`. Repository: [SignalSafeSoftware/sqlphilosophy](https://github.com/SignalSafeSoftware/sqlphilosophy).
+The current published release is **0.3.6**, verified from PyPI metadata. **0.4.0** is prepared for SQLAlchemy 2.1; publish only after its reviewed source, complete checks and exact artifacts are approved. Repository: [SignalSafeSoftware/sqlphilosophy](https://github.com/SignalSafeSoftware/sqlphilosophy).
 
 ## Checks and artifacts
 
@@ -9,7 +9,7 @@ uv sync --frozen --extra dev
 uv lock --check
 uv run ruff check src tests
 uv run ruff format --check src tests
-uv run mypy src --install-types --non-interactive
+uv run mypy --strict src tests/typing --install-types --non-interactive
 uv run bandit -r src -q
 uv run pytest -q
 uv run python scripts/smoke_package.py
@@ -19,8 +19,7 @@ The smoke script builds wheel/sdist, validates metadata, installs the actual whe
 in a clean environment, and verifies public imports and `py.typed`. Inspect both
 archives for source/metadata ownership before approving their hashes.
 Run both SQLite examples (`docs/examples/typed_repository_sync.py` and
-`docs/examples/typed_repository_async.py`) and verify SQLAlchemy 2.0.49 and 2.1.5
-in separate disposable environments. Keep host SQLAlchemy constraints unchanged.
+`docs/examples/typed_repository_async.py`) and verify SQLAlchemy 2.1.9 in disposable environments. SQLAlchemy 2.0 hosts must retain the existing 0.3.x package until explicitly migrated.
 
 Build dependencies use setuptools `>=84.2.1,<85` and wheel `>=0.46,<1`.
 They are build tools, not runtime dependencies. The source version, built metadata,
@@ -44,7 +43,7 @@ scan and package smoke; a skipped/failed scan cannot publish.
 
 **Manual dispatch on `main` is a publishing action.** It is not a check-only preview.
 After explicit release approval and all required checks, use the exact approved
-`v0.3.5` tag on the reviewed main commit (or the existing approved main dispatch).
+`v0.4.0` tag on the reviewed main commit (or the existing approved main dispatch).
 A PR, release note or this file does not itself authorize tag creation or upload.
 Do not retag or retry a version until registry readback proves whether it exists.
 
